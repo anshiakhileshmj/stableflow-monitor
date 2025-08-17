@@ -101,6 +101,30 @@ export type Database = {
         }
         Relationships: []
       }
+      tracked_wallets: {
+        Row: {
+          address: string
+          created_at: string
+          id: string
+          name: string | null
+          network: string
+        }
+        Insert: {
+          address: string
+          created_at?: string
+          id?: string
+          name?: string | null
+          network?: string
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          id?: string
+          name?: string | null
+          network?: string
+        }
+        Relationships: []
+      }
       wallet_risk_ratings: {
         Row: {
           failed_transactions: number

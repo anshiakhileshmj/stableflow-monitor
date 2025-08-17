@@ -1,3 +1,4 @@
+
 import { GraphQLClient } from 'graphql-request';
 import {
   RecentStablecoinTransfersDocument,
@@ -9,7 +10,7 @@ import {
 } from './schema';
 import { bitqueryBalanceService } from './bitquery-balance';
 
-const endpoint = 'https://graphql.bitquery.io/';
+const endpoint = 'https://streaming.bitquery.io/graphql';
 
 class BitqueryClient {
   private client: GraphQLClient;
@@ -18,6 +19,7 @@ class BitqueryClient {
     this.client = new GraphQLClient(endpoint, {
       headers: {
         'X-API-KEY': apiKey,
+        'Authorization': `Bearer ${apiKey}`
       },
     });
   }
@@ -66,4 +68,6 @@ class BitqueryClient {
   }
 }
 
-export const bitqueryClient = new BitqueryClient(process.env.NEXT_PUBLIC_BITQUERY_API_KEY as string);
+// Use environment variable or empty string as fallback
+const apiKey = import.meta.env.VITE_BITQUERY_API_KEY || '';
+export const bitqueryClient = new BitqueryClient(apiKey);

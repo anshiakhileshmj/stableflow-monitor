@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { bitqueryService } from '@/lib/bitquery';
+import { bitqueryBalanceService } from '@/lib/bitquery-balance';
 
 interface TokenBalance {
   amount: string;
@@ -41,7 +41,7 @@ export const useRealTimeBalance = (wallets: WalletData[], network: string) => {
 
     try {
       console.log('🔍 Fetching balances for wallets:', wallets.map(w => w.address));
-      const balanceData = await bitqueryService.getCurrentBalances(wallets, network);
+      const balanceData = await bitqueryBalanceService.getCurrentBalances(wallets, network);
       setBalances(balanceData);
       setLastUpdate(new Date());
       console.log('✅ Balances updated:', balanceData);
@@ -71,14 +71,14 @@ export const useRealTimeBalance = (wallets: WalletData[], network: string) => {
       console.log('🚀 Starting balance tracking...');
       
       // Initialize WebSocket connection
-      await bitqueryService.initWebSocket();
+      await bitqueryBalanceService.initWebSocket();
       setIsConnected(true);
 
       // Add balance update listener
-      bitqueryService.addBalanceListener(handleBalanceUpdate);
+      bitqueryBalanceService.addBalanceListener(handleBalanceUpdate);
 
       // Subscribe to real-time updates
-      subscriptionRef.current = bitqueryService.subscribeToBalanceUpdates(wallets, network);
+      subscriptionRef.current = bitqueryBalanceService.subscribeToBalanceUpdates(wallets, network);
 
       // Fetch initial balances
       await fetchBalances();
@@ -97,7 +97,7 @@ export const useRealTimeBalance = (wallets: WalletData[], network: string) => {
     console.log('🛑 Stopping balance tracking...');
     
     if (subscriptionRef.current) {
-      bitqueryService.unsubscribe(subscriptionRef.current);
+      bitqueryBalanceService.unsubscribe(subscriptionRef.current);
       subscriptionRef.current = null;
     }
 
@@ -106,7 +106,7 @@ export const useRealTimeBalance = (wallets: WalletData[], network: string) => {
       intervalRef.current = null;
     }
 
-    bitqueryService.removeBalanceListener(handleBalanceUpdate);
+    bitqueryBalanceService.removeBalanceListener(handleBalanceUpdate);
     setIsConnected(false);
   }, [handleBalanceUpdate]);
 
