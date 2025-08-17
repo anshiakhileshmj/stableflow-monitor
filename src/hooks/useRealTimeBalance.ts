@@ -67,6 +67,21 @@ export const useRealTimeBalance = (wallets: WalletData[], network: string) => {
   const startTracking = useCallback(async () => {
     if (wallets.length === 0) return;
 
+    // Check if API keys are available
+    const apiKey = import.meta.env.VITE_BITQUERY_API_KEY;
+    const token = import.meta.env.VITE_BITQUERY_TOKEN;
+
+    if (!apiKey || !token) {
+      console.warn('⚠️ Bitquery API keys not configured. Real-time tracking disabled.');
+      // Still fetch initial balances if possible
+      try {
+        await fetchBalances();
+      } catch (error) {
+        console.error('❌ Failed to fetch initial balances:', error);
+      }
+      return;
+    }
+
     try {
       console.log('🚀 Starting balance tracking...');
       
