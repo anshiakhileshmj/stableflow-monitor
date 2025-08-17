@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -167,8 +168,26 @@ async function startRealTimeMonitoring(supabase: any) {
         const usdValue = amount; // Assuming 1:1 for stablecoins
         const isWhale = usdValue >= 100000; // $100k+ is whale
 
+        // Create a unique composite key for checking duplicates, but let the database generate the UUID
+        const compositeKey = `${transfer.Transaction.Hash}-${transfer.Transfer.Sender}-${transfer.Transfer.Receiver}`;
+
+        // Check if this transfer already exists
+        const { data: existingTransfer } = await supabase
+          .from('real_time_transfers')
+          .select('id')
+          .eq('hash', transfer.Transaction.Hash)
+          .eq('from_address', transfer.Transfer.Sender)
+          .eq('to_address', transfer.Transfer.Receiver)
+          .eq('amount', amount)
+          .single();
+
+        if (existingTransfer) {
+          console.log(`Transfer already exists, skipping: ${compositeKey}`);
+          continue;
+        }
+
         const transferData = {
-          id: `${transfer.Transaction.Hash}-${transfer.Transfer.Sender}`,
+          // Remove the id field - let the database generate it
           hash: transfer.Transaction.Hash,
           timestamp: new Date(transfer.Block.Time).toISOString(),
           block_number: transfer.Block.Number,
@@ -184,7 +203,7 @@ async function startRealTimeMonitoring(supabase: any) {
         // Store in database with proper column names
         const { error } = await supabase
           .from('real_time_transfers')
-          .upsert(transferData, { onConflict: 'id' });
+          .insert(transferData);
 
         if (error) {
           console.error('Error storing transfer:', error);

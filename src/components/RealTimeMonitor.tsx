@@ -79,6 +79,7 @@ const RealTimeMonitor = () => {
       });
       
       if (data?.transfers && Array.isArray(data.transfers)) {
+        console.log('Fetched transfers:', data.transfers);
         setTransfers(data.transfers);
         updateStats(data.transfers);
       }
@@ -95,6 +96,7 @@ const RealTimeMonitor = () => {
       });
       
       if (data?.whales && Array.isArray(data.whales)) {
+        console.log('Fetched whale alerts:', data.whales);
         setWhaleAlerts(data.whales);
       }
     } catch (error) {
@@ -171,6 +173,8 @@ const RealTimeMonitor = () => {
   useEffect(() => {
     if (!isConnected) return;
 
+    console.log('Setting up real-time subscription...');
+    
     const transferChannel = supabase
       .channel('real-time-transfers')
       .on(
@@ -181,6 +185,7 @@ const RealTimeMonitor = () => {
           table: 'real_time_transfers'
         },
         (payload) => {
+          console.log('New transfer received via real-time:', payload);
           const newTransfer = payload.new as RealTimeTransfer;
           setTransfers(prev => [newTransfer, ...prev].slice(0, 100));
           
@@ -212,10 +217,11 @@ const RealTimeMonitor = () => {
     }, 30000);
 
     return () => {
+      console.log('Cleaning up real-time subscription...');
       supabase.removeChannel(transferChannel);
       clearInterval(interval);
     };
-  }, [isConnected, notificationsEnabled]);
+  }, [isConnected, notificationsEnabled, toast]);
 
   // Check notification permission on mount and restore monitoring state
   useEffect(() => {
@@ -225,6 +231,7 @@ const RealTimeMonitor = () => {
     
     // If monitoring was active, restore data
     if (isConnected) {
+      console.log('Restoring monitoring state, fetching data...');
       fetchRecentTransfers();
       fetchWhaleAlerts();
     }
