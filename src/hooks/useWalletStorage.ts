@@ -16,6 +16,15 @@ export const useWalletStorage = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // Generate a proper UUID
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
   // Fetch wallets from localStorage initially, then from Supabase
   const fetchWallets = async () => {
     try {
@@ -29,7 +38,7 @@ export const useWalletStorage = () => {
       // Then fetch from Supabase (if available)
       const { data, error } = await supabase
         .from('tracked_wallets')
-        .select('*')
+        .select('id, address, name, network, created_at')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -68,7 +77,7 @@ export const useWalletStorage = () => {
       }
 
       const newWallet: WalletData = {
-        id: `${Date.now()}-${Math.random()}`,
+        id: generateUUID(),
         ...walletData,
         created_at: new Date().toISOString()
       };

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { bitqueryBalanceService } from '@/lib/bitquery-balance';
 
@@ -67,39 +66,24 @@ export const useRealTimeBalance = (wallets: WalletData[], network: string) => {
   const startTracking = useCallback(async () => {
     if (wallets.length === 0) return;
 
-    // Check if API keys are available
-    const apiKey = import.meta.env.VITE_BITQUERY_API_KEY;
-    const token = import.meta.env.VITE_BITQUERY_TOKEN;
-
-    if (!apiKey || !token) {
-      console.warn('⚠️ Bitquery API keys not configured. Real-time tracking disabled.');
-      // Still fetch initial balances if possible
-      try {
-        await fetchBalances();
-      } catch (error) {
-        console.error('❌ Failed to fetch initial balances:', error);
-      }
-      return;
-    }
-
     try {
       console.log('🚀 Starting balance tracking...');
       
-      // Initialize WebSocket connection
+      // Initialize WebSocket connection (currently a placeholder)
       await bitqueryBalanceService.initWebSocket();
       setIsConnected(true);
 
       // Add balance update listener
       bitqueryBalanceService.addBalanceListener(handleBalanceUpdate);
 
-      // Subscribe to real-time updates
+      // Subscribe to real-time updates (currently a placeholder)
       subscriptionRef.current = bitqueryBalanceService.subscribeToBalanceUpdates(wallets, network);
 
       // Fetch initial balances
       await fetchBalances();
 
-      // Set up periodic refresh
-      intervalRef.current = setInterval(fetchBalances, 30000); // Every 30 seconds
+      // Set up periodic refresh (every 30 seconds)
+      intervalRef.current = setInterval(fetchBalances, 30000);
 
       console.log('✅ Balance tracking started');
     } catch (error) {
