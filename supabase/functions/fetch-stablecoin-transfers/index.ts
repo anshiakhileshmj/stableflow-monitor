@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
 
@@ -35,7 +36,10 @@ serve(async (req) => {
                   SmartContract: {
                     in: [
                       "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-                      "0xdac17f958d2ee523a2206206994597c13d831ec7"
+                      "0xdac17f958d2ee523a2206206994597c13d831ec7",
+                      "0x6c3ea9036406852006290770bedfcaba0e23a0e8",
+                      "0x4c9edd5852cd905f086c759e8383e09bff1e68b3",
+                      "0x4c9edd5852cd905f086c759e8383e09bff1e68b3"
                     ]
                   }
                 }
