@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import AddressDisplay from "@/components/AddressDisplay";
 
 interface Transaction {
   Transaction: {
@@ -318,7 +319,7 @@ const HistoryCheck = () => {
           <CardHeader>
             <CardTitle>Analysis Results</CardTitle>
             <CardDescription>
-              Transaction analysis for {truncateAddress(walletAddress)}
+              Transaction analysis for <AddressDisplay address={walletAddress} />
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -406,17 +407,17 @@ const HistoryCheck = () => {
                 <TableBody>
                   {transactions.map((tx, index) => (
                     <TableRow key={index}>
-                      <TableCell className="font-mono">
-                        {truncateAddress(tx.Transaction.Hash)}
+                      <TableCell>
+                        <AddressDisplay address={tx.Transaction.Hash} />
                       </TableCell>
                       <TableCell>
                         {formatTimestamp(tx.Block.Time)}
                       </TableCell>
-                      <TableCell className="font-mono">
-                        {truncateAddress(tx.Transaction.From)}
+                      <TableCell>
+                        <AddressDisplay address={tx.Transaction.From} />
                       </TableCell>
-                      <TableCell className="font-mono">
-                        {truncateAddress(tx.Transaction.To || '')}
+                      <TableCell>
+                        <AddressDisplay address={tx.Transaction.To || ''} />
                       </TableCell>
                       <TableCell className="font-mono">
                         {formatEth(parseFloat(tx.Transaction.Value || '0'))}

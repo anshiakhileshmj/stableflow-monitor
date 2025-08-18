@@ -12,6 +12,7 @@ import AppHeader from "@/components/AppHeader";
 import RealTimeMonitor from "@/components/RealTimeMonitor";
 import BalanceTracker from "@/components/balance-tracker/BalanceTracker";
 import HistoryCheck from "@/components/HistoryCheck";
+import AddressDisplay from "@/components/AddressDisplay";
 
 interface Transfer {
   tokenSymbol: string;
@@ -238,11 +239,11 @@ const Index = () => {
                         <TableCell className="font-mono">
                           {parseFloat(transfer.amount).toLocaleString()}
                         </TableCell>
-                        <TableCell className="font-mono">
-                          {truncateAddress(transfer.senderAddress)}
+                        <TableCell>
+                          <AddressDisplay address={transfer.senderAddress} />
                         </TableCell>
-                        <TableCell className="font-mono">
-                          {truncateAddress(transfer.receiverAddress)}
+                        <TableCell>
+                          <AddressDisplay address={transfer.receiverAddress} />
                         </TableCell>
                         <TableCell>
                           {formatTimestamp(transfer.timestamp)}
@@ -368,17 +369,17 @@ const Index = () => {
                             <TableBody>
                               {transactions.map((tx) => (
                                 <TableRow key={tx.hash}>
-                                  <TableCell className="font-mono">
-                                    {truncateAddress(tx.hash)}
+                                  <TableCell>
+                                    <AddressDisplay address={tx.hash} />
                                   </TableCell>
                                   <TableCell className="font-mono">
                                     {parseFloat(tx.value).toFixed(6)}
                                   </TableCell>
-                                  <TableCell className="font-mono">
-                                    {truncateAddress(tx.from)}
+                                  <TableCell>
+                                    <AddressDisplay address={tx.from} />
                                   </TableCell>
-                                  <TableCell className="font-mono">
-                                    {truncateAddress(tx.to)}
+                                  <TableCell>
+                                    <AddressDisplay address={tx.to} />
                                   </TableCell>
                                   <TableCell>
                                     {tx.isError ? (
@@ -429,11 +430,11 @@ const Index = () => {
                                 <TableCell className="font-mono">
                                   {parseFloat(transfer.value).toLocaleString()}
                                 </TableCell>
-                                <TableCell className="font-mono">
-                                  {truncateAddress(transfer.from)}
+                                <TableCell>
+                                  <AddressDisplay address={transfer.from} />
                                 </TableCell>
-                                <TableCell className="font-mono">
-                                  {truncateAddress(transfer.to)}
+                                <TableCell>
+                                  <AddressDisplay address={transfer.to} />
                                 </TableCell>
                                 <TableCell>
                                   {formatTimestamp(transfer.timeStamp)}
@@ -465,17 +466,17 @@ const Index = () => {
                           <TableBody>
                             {internalTransactions.map((tx, index) => (
                               <TableRow key={`${tx.hash}-${index}`}>
-                                <TableCell className="font-mono">
-                                  {truncateAddress(tx.hash)}
+                                <TableCell>
+                                  <AddressDisplay address={tx.hash} />
                                 </TableCell>
                                 <TableCell className="font-mono">
                                   {(parseFloat(tx.value) / 1e18).toFixed(6)}
                                 </TableCell>
-                                <TableCell className="font-mono">
-                                  {truncateAddress(tx.from)}
+                                <TableCell>
+                                  <AddressDisplay address={tx.from} />
                                 </TableCell>
-                                <TableCell className="font-mono">
-                                  {truncateAddress(tx.to)}
+                                <TableCell>
+                                  <AddressDisplay address={tx.to} />
                                 </TableCell>
                                 <TableCell>
                                   {tx.isError === '1' ? (

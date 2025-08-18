@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, X, Coins } from 'lucide-react';
 import { formatAddress, formatBalance } from '@/utils/formatters';
+import AddressDisplay from '@/components/AddressDisplay';
 
 interface TokenBalance {
   amount: string;
@@ -75,9 +75,7 @@ const WalletBalanceCard: React.FC<WalletBalanceCardProps> = ({
             <h4 className="font-semibold text-sm">
               {name || formatAddress(address)}
             </h4>
-            <p className="text-xs text-muted-foreground font-mono">
-              {formatAddress(address)}
-            </p>
+            <AddressDisplay address={address} className="text-xs text-muted-foreground" />
             <Badge 
               variant="secondary" 
               className={`text-xs ${getNetworkColor(network)}`}
