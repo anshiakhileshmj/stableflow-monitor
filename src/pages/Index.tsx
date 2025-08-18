@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,21 +11,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Shield, AlertTriangle, TrendingUp, Radio, Wallet, History } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import RealTimeMonitor from "@/components/RealTimeMonitor";
+import StablecoinTransfersTab from "@/components/StablecoinTransfersTab";
 import BalanceTracker from "@/components/balance-tracker/BalanceTracker";
 import HistoryCheck from "@/components/HistoryCheck";
 import AddressDisplay from "@/components/AddressDisplay";
 import NetworkSelector from "@/components/NetworkSelector";
 import { SUPPORTED_NETWORKS } from '@/lib/networks';
-
-interface Transfer {
-  tokenSymbol: string;
-  tokenName: string;
-  amount: string;
-  senderAddress: string;
-  receiverAddress: string;
-  timestamp: string;
-  network?: string;
-}
 
 interface Transaction {
   hash: string;
@@ -64,7 +56,6 @@ interface RiskAnalysis {
 }
 
 const Index = () => {
-  const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [network, setNetwork] = useState("ethereum");
   const [walletAddress, setWalletAddress] = useState("");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -72,39 +63,8 @@ const Index = () => {
   const [internalTransactions, setInternalTransactions] = useState<InternalTransaction[]>([]);
   const [walletBalance, setWalletBalance] = useState<string>("");
   const [riskAnalysis, setRiskAnalysis] = useState<RiskAnalysis | null>(null);
-  const [isLoadingTransfers, setIsLoadingTransfers] = useState(false);
   const [isAnalyzingWallet, setIsAnalyzingWallet] = useState(false);
   const { toast } = useToast();
-
-  const fetchStablecoinTransfers = async () => {
-    setIsLoadingTransfers(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('fetch-stablecoin-transfers', {
-        body: { network }
-      });
-      
-      if (error) throw error;
-      
-      // Ensure transfers is always an array
-      const transfersData = Array.isArray(data?.transfers) ? data.transfers : [];
-      setTransfers(transfersData);
-      
-      toast({
-        title: "Success",
-        description: `Fetched ${transfersData.length} recent stablecoin transfers from ${SUPPORTED_NETWORKS[network]?.name || network}`,
-      });
-    } catch (error) {
-      console.error('Error fetching transfers:', error);
-      setTransfers([]); // Always set empty array on error
-      toast({
-        title: "Error",
-        description: `Failed to fetch stablecoin transfers from ${SUPPORTED_NETWORKS[network]?.name || network}. Please check the API configuration.`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingTransfers(false);
-    }
-  };
 
   const analyzeWallet = async () => {
     if (!walletAddress.trim()) {
@@ -158,17 +118,9 @@ const Index = () => {
     return new Date(timestamp).toLocaleString();
   };
 
-  const truncateAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
   const getNativeSymbol = () => {
     return SUPPORTED_NETWORKS[network]?.nativeCurrency.symbol || 'TOKEN';
   };
-
-  useEffect(() => {
-    fetchStablecoinTransfers();
-  }, [network]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -209,75 +161,7 @@ const Index = () => {
             </TabsList>
 
             <TabsContent value="transfers" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    Recent Stablecoin Transfers
-                    <div className="flex items-center gap-4">
-                      <NetworkSelector
-                        value={network}
-                        onValueChange={setNetwork}
-                        className="w-48"
-                      />
-                      <Button 
-                        onClick={fetchStablecoinTransfers}
-                        disabled={isLoadingTransfers}
-                        size="sm"
-                      >
-                        {isLoadingTransfers ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          "Refresh"
-                        )}
-                      </Button>
-                    </div>
-                  </CardTitle>
-                  <CardDescription>
-                    Live tracking of stablecoin transfers on {SUPPORTED_NETWORKS[network]?.name || network}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Token</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>From</TableHead>
-                        <TableHead>To</TableHead>
-                        <TableHead>Timestamp</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {Array.isArray(transfers) && transfers.map((transfer, index) => (
-                        <TableRow key={index}>
-                          <TableCell>
-                            <Badge variant="outline">{transfer.tokenSymbol}</Badge>
-                          </TableCell>
-                          <TableCell className="font-mono">
-                            {parseFloat(transfer.amount).toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            <AddressDisplay address={transfer.senderAddress} />
-                          </TableCell>
-                          <TableCell>
-                            <AddressDisplay address={transfer.receiverAddress} />
-                          </TableCell>
-                          <TableCell>
-                            {formatTimestamp(transfer.timestamp)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {(!Array.isArray(transfers) || transfers.length === 0) && !isLoadingTransfers && (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                            No transfers found on {SUPPORTED_NETWORKS[network]?.name || network}. Click refresh to fetch latest data.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+              <StablecoinTransfersTab />
             </TabsContent>
 
             <TabsContent value="wallet" className="space-y-6">

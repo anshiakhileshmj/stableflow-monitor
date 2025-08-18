@@ -29,12 +29,10 @@ const RealTimeMonitor = () => {
   const [allTransfers, setAllTransfers] = useState<RealTimeTransfer[]>([]);
   const [allWhaleAlerts, setAllWhaleAlerts] = useState<RealTimeTransfer[]>([]);
   const [filterNetwork, setFilterNetwork] = useState<string>("all");
-  const [isConnected, setIsConnected] = useState(() => {
-    const saved = localStorage.getItem('rtm-monitoring-active');
-    return saved === 'true';
-  });
+  const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [monitoringInterval, setMonitoringInterval] = useState<NodeJS.Timeout | null>(null);
   const [stats, setStats] = useState({
     totalTransfers: 0,
     totalVolume: 0,
@@ -54,73 +52,14 @@ const RealTimeMonitor = () => {
     return allWhaleAlerts.filter(alert => alert.network === filterNetwork);
   };
 
-  const startMonitoring = async () => {
-    setIsLoading(true);
-    try {
-      console.log('🚀 Starting monitoring for all networks...');
-      
-      // Start monitoring for all supported networks
-      const networks = Object.keys(SUPPORTED_NETWORKS);
-      const monitoringPromises = networks.map(async (network) => {
-        try {
-          const { error } = await supabase.functions.invoke('real-time-monitor', {
-            body: { action: 'start_monitoring', network }
-          });
-          
-          if (error) {
-            console.error(`Error starting monitoring for ${network}:`, error);
-            return { network, success: false, error };
-          }
-          
-          return { network, success: true };
-        } catch (error) {
-          console.error(`Failed to start monitoring for ${network}:`, error);
-          return { network, success: false, error };
-        }
-      });
-
-      const results = await Promise.all(monitoringPromises);
-      const successfulNetworks = results.filter(r => r.success).map(r => r.network);
-      const failedNetworks = results.filter(r => !r.success).map(r => r.network);
-
-      if (successfulNetworks.length > 0) {
-        setIsConnected(true);
-        localStorage.setItem('rtm-monitoring-active', 'true');
-        
-        toast({
-          title: "Multi-Network Monitoring Started",
-          description: `Monitoring ${successfulNetworks.length} blockchain${successfulNetworks.length > 1 ? 's' : ''}: ${successfulNetworks.map(n => SUPPORTED_NETWORKS[n]?.name).join(', ')}`,
-        });
-
-        // Fetch initial data from all networks
-        await fetchAllNetworksData();
-      }
-
-      if (failedNetworks.length > 0) {
-        console.warn('Failed to start monitoring for:', failedNetworks);
-        toast({
-          title: "Partial Success",
-          description: `Failed to start monitoring for: ${failedNetworks.join(', ')}`,
-          variant: "destructive",
-        });
-      }
-
-    } catch (error) {
-      console.error('Error starting multi-network monitoring:', error);
-      toast({
-        title: "Error",
-        description: "Failed to start multi-network monitoring",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const fetchAllNetworksData = async () => {
+    if (!isConnected) return;
+    
     const networks = Object.keys(SUPPORTED_NETWORKS);
     
     try {
+      console.log('📡 Fetching whale transfers from all networks...');
+      
       // Fetch transfers from all networks
       const transferPromises = networks.map(async (network) => {
         try {
@@ -167,11 +106,86 @@ const RealTimeMonitor = () => {
       setAllWhaleAlerts(combinedWhales);
       updateStats(combinedTransfers);
 
-      console.log(`✅ Fetched ${combinedTransfers.length} transfers and ${combinedWhales.length} whale alerts from all networks`);
+      console.log(`✅ Fetched ${combinedTransfers.length} transfers and ${combinedWhales.length} whale alerts`);
 
     } catch (error) {
       console.error('Error fetching data from all networks:', error);
     }
+  };
+
+  const startMonitoring = async () => {
+    setIsLoading(true);
+    try {
+      console.log('🚀 Starting continuous monitoring for all networks...');
+      
+      // Start monitoring for all supported networks
+      const networks = Object.keys(SUPPORTED_NETWORKS);
+      const monitoringPromises = networks.map(async (network) => {
+        try {
+          const { error } = await supabase.functions.invoke('real-time-monitor', {
+            body: { action: 'start_monitoring', network }
+          });
+          
+          if (error) {
+            console.error(`Error starting monitoring for ${network}:`, error);
+            return { network, success: false, error };
+          }
+          
+          return { network, success: true };
+        } catch (error) {
+          console.error(`Failed to start monitoring for ${network}:`, error);
+          return { network, success: false, error };
+        }
+      });
+
+      const results = await Promise.all(monitoringPromises);
+      const successfulNetworks = results.filter(r => r.success).map(r => r.network);
+
+      if (successfulNetworks.length > 0) {
+        setIsConnected(true);
+        
+        toast({
+          title: "Continuous Monitoring Started",
+          description: `Monitoring ${successfulNetworks.length} blockchain${successfulNetworks.length > 1 ? 's' : ''} for whale transfers`,
+        });
+
+        // Fetch initial data
+        await fetchAllNetworksData();
+        
+        // Set up continuous monitoring - fetch every 10 seconds
+        const interval = setInterval(() => {
+          fetchAllNetworksData();
+        }, 10000);
+        
+        setMonitoringInterval(interval);
+      }
+
+    } catch (error) {
+      console.error('Error starting continuous monitoring:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start continuous monitoring",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const stopMonitoring = () => {
+    if (monitoringInterval) {
+      clearInterval(monitoringInterval);
+      setMonitoringInterval(null);
+    }
+    
+    setIsConnected(false);
+    setAllTransfers([]);
+    setAllWhaleAlerts([]);
+    
+    toast({
+      title: "Monitoring Stopped",
+      description: "Continuous whale transfer monitoring has been stopped",
+    });
   };
 
   const updateStats = (transfers: RealTimeTransfer[]) => {
@@ -193,17 +207,6 @@ const RealTimeMonitor = () => {
       totalVolume,
       whaleCount,
       avgTransferSize: transfers.length > 0 ? totalVolume / transfers.length : 0
-    });
-  };
-
-  const stopMonitoring = () => {
-    setIsConnected(false);
-    localStorage.setItem('rtm-monitoring-active', 'false');
-    setAllTransfers([]);
-    setAllWhaleAlerts([]);
-    toast({
-      title: "Monitoring Stopped",
-      description: "Multi-network transfer monitoring has been stopped",
     });
   };
 
@@ -231,7 +234,7 @@ const RealTimeMonitor = () => {
       if (permission === 'granted') {
         toast({
           title: "Notifications Enabled",
-          description: "You will receive whale alerts for large transfers across all networks",
+          description: "You will receive whale alerts for large transfers",
         });
       }
     }
@@ -249,19 +252,11 @@ const RealTimeMonitor = () => {
     }
   };
 
-  // Restore monitoring state on mount
-  useEffect(() => {
-    if (isConnected) {
-      console.log('Restoring multi-network monitoring state...');
-      fetchAllNetworksData();
-    }
-  }, []);
-
   // Set up real-time subscriptions for all networks
   useEffect(() => {
     if (!isConnected) return;
 
-    console.log('Setting up real-time subscriptions for all networks...');
+    console.log('Setting up real-time subscriptions...');
     
     const channels = Object.keys(SUPPORTED_NETWORKS).map(network => {
       return supabase
@@ -275,7 +270,7 @@ const RealTimeMonitor = () => {
             filter: `network=eq.${network}`
           },
           (payload) => {
-            console.log(`New transfer received via real-time for ${network}:`, payload);
+            console.log(`New transfer received for ${network}:`, payload);
             const newTransfer = payload.new as RealTimeTransfer;
             
             setAllTransfers(prev => [newTransfer, ...prev].slice(0, 200));
@@ -302,15 +297,9 @@ const RealTimeMonitor = () => {
         .subscribe();
     });
 
-    // Auto-refresh data every 30 seconds
-    const interval = setInterval(() => {
-      fetchAllNetworksData();
-    }, 30000);
-
     return () => {
       console.log('Cleaning up real-time subscriptions...');
       channels.forEach(channel => supabase.removeChannel(channel));
-      clearInterval(interval);
     };
   }, [isConnected, notificationsEnabled, toast]);
 
@@ -327,6 +316,15 @@ const RealTimeMonitor = () => {
     updateStats(filteredTransfers);
   }, [filterNetwork, allTransfers]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (monitoringInterval) {
+        clearInterval(monitoringInterval);
+      }
+    };
+  }, [monitoringInterval]);
+
   const filteredTransfers = getFilteredTransfers();
   const filteredWhaleAlerts = getFilteredWhaleAlerts();
 
@@ -337,13 +335,13 @@ const RealTimeMonitor = () => {
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Radio className="w-5 h-5" />
-              Real-Time Transfer Monitor
+              Real-Time Whale Transfer Monitor
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
                 <span className="text-sm text-muted-foreground">
-                  {isConnected ? 'Multi-Network Monitoring Active' : 'Disconnected'}
+                  {isConnected ? 'Continuous Monitoring Active' : 'Disconnected'}
                 </span>
               </div>
               <Button
@@ -387,7 +385,7 @@ const RealTimeMonitor = () => {
             </div>
           </CardTitle>
           <CardDescription>
-            Live tracking of large cryptocurrency transfers with whale detection across all supported blockchains
+            Continuous tracking of whale cryptocurrency transfers across all supported blockchains
           </CardDescription>
         </CardHeader>
       </Card>
@@ -554,7 +552,7 @@ const RealTimeMonitor = () => {
                           <TableRow>
                             <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                               {allTransfers.length === 0 
-                                ? "No transfers found. Start monitoring to see live data from all networks."
+                                ? "No transfers found. Monitoring will update live as transfers occur."
                                 : `No transfers found for ${filterNetwork === "all" ? "selected filter" : SUPPORTED_NETWORKS[filterNetwork]?.name}.`
                               }
                             </TableCell>
@@ -615,7 +613,7 @@ const RealTimeMonitor = () => {
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                             {allWhaleAlerts.length === 0
-                              ? "No whale transfers detected yet across all networks."
+                              ? "No whale transfers detected yet. Monitoring will update live as whale transfers occur."
                               : `No whale transfers found for ${filterNetwork === "all" ? "selected filter" : SUPPORTED_NETWORKS[filterNetwork]?.name}.`
                             }
                           </TableCell>
