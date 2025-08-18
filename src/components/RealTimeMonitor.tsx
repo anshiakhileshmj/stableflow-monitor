@@ -7,6 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Radio, Waves, AlertTriangle, Bell, BellOff } from "lucide-react";
+import NetworkSelector from "@/components/NetworkSelector";
+import { SUPPORTED_NETWORKS } from '@/lib/networks';
 
 interface RealTimeTransfer {
   id: string;
@@ -25,9 +27,10 @@ interface RealTimeTransfer {
 const RealTimeMonitor = () => {
   const [transfers, setTransfers] = useState<RealTimeTransfer[]>([]);
   const [whaleAlerts, setWhaleAlerts] = useState<RealTimeTransfer[]>([]);
+  const [network, setNetwork] = useState("ethereum");
   // Use localStorage to persist monitoring state across tab switches
   const [isConnected, setIsConnected] = useState(() => {
-    const saved = localStorage.getItem('rtm-monitoring-active');
+    const saved = localStorage.getItem(`rtm-monitoring-active-${network}`);
     return saved === 'true';
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -44,16 +47,16 @@ const RealTimeMonitor = () => {
     setIsLoading(true);
     try {
       const { error } = await supabase.functions.invoke('real-time-monitor', {
-        body: { action: 'start_monitoring' }
+        body: { action: 'start_monitoring', network }
       });
       
       if (error) throw error;
       
       setIsConnected(true);
-      localStorage.setItem('rtm-monitoring-active', 'true');
+      localStorage.setItem(`rtm-monitoring-active-${network}`, 'true');
       toast({
         title: "Monitoring Started",
-        description: "Real-time transfer monitoring is now active",
+        description: `Real-time transfer monitoring is now active on ${SUPPORTED_NETWORKS[network]?.name || network}`,
       });
       
       // Start fetching data
@@ -64,7 +67,7 @@ const RealTimeMonitor = () => {
       console.error('Error starting monitoring:', error);
       toast({
         title: "Error",
-        description: "Failed to start real-time monitoring",
+        description: `Failed to start real-time monitoring on ${SUPPORTED_NETWORKS[network]?.name || network}`,
         variant: "destructive",
       });
     } finally {
@@ -75,16 +78,16 @@ const RealTimeMonitor = () => {
   const fetchRecentTransfers = async () => {
     try {
       const { data } = await supabase.functions.invoke('real-time-monitor', {
-        body: { action: 'get_recent_transfers' }
+        body: { action: 'get_recent_transfers', network }
       });
       
       if (data?.transfers && Array.isArray(data.transfers)) {
-        console.log('Fetched transfers:', data.transfers);
+        console.log(`Fetched transfers for ${network}:`, data.transfers);
         setTransfers(data.transfers);
         updateStats(data.transfers);
       }
     } catch (error) {
-      console.error('Error fetching transfers:', error);
+      console.error(`Error fetching transfers for ${network}:`, error);
       setTransfers([]); // Set empty array on error
     }
   };
@@ -92,15 +95,15 @@ const RealTimeMonitor = () => {
   const fetchWhaleAlerts = async () => {
     try {
       const { data } = await supabase.functions.invoke('real-time-monitor', {
-        body: { action: 'get_whale_alerts' }
+        body: { action: 'get_whale_alerts', network }
       });
       
       if (data?.whales && Array.isArray(data.whales)) {
-        console.log('Fetched whale alerts:', data.whales);
+        console.log(`Fetched whale alerts for ${network}:`, data.whales);
         setWhaleAlerts(data.whales);
       }
     } catch (error) {
-      console.error('Error fetching whale alerts:', error);
+      console.error(`Error fetching whale alerts for ${network}:`, error);
       setWhaleAlerts([]); // Set empty array on error
     }
   };
@@ -169,23 +172,39 @@ const RealTimeMonitor = () => {
     }
   };
 
+  // Reset monitoring state when network changes
+  useEffect(() => {
+    const saved = localStorage.getItem(`rtm-monitoring-active-${network}`);
+    setIsConnected(saved === 'true');
+    setTransfers([]);
+    setWhaleAlerts([]);
+    
+    // If was connected for this network, restore data
+    if (saved === 'true') {
+      console.log(`Restoring monitoring state for ${network}, fetching data...`);
+      fetchRecentTransfers();
+      fetchWhaleAlerts();
+    }
+  }, [network]);
+
   // Set up real-time subscriptions
   useEffect(() => {
     if (!isConnected) return;
 
-    console.log('Setting up real-time subscription...');
+    console.log(`Setting up real-time subscription for ${network}...`);
     
     const transferChannel = supabase
-      .channel('real-time-transfers')
+      .channel(`real-time-transfers-${network}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'real_time_transfers'
+          table: 'real_time_transfers',
+          filter: `network=eq.${network}`
         },
         (payload) => {
-          console.log('New transfer received via real-time:', payload);
+          console.log(`New transfer received via real-time for ${network}:`, payload);
           const newTransfer = payload.new as RealTimeTransfer;
           setTransfers(prev => [newTransfer, ...prev].slice(0, 100));
           
@@ -194,7 +213,7 @@ const RealTimeMonitor = () => {
             
             // Show notification for whale transfers
             if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-              new Notification('🐋 Whale Alert!', {
+              new Notification(`🐋 Whale Alert on ${SUPPORTED_NETWORKS[network]?.name}!`, {
                 body: `${formatUSD(newTransfer.usd_value)} ${newTransfer.currency} transfer detected`,
                 icon: '/favicon.ico'
               });
@@ -202,7 +221,7 @@ const RealTimeMonitor = () => {
             
             // Show toast notification
             toast({
-              title: "🐋 Whale Alert!",
+              title: `🐋 Whale Alert on ${SUPPORTED_NETWORKS[network]?.name}!`,
               description: `${formatUSD(newTransfer.usd_value)} ${newTransfer.currency} transfer detected`,
             });
           }
@@ -217,30 +236,23 @@ const RealTimeMonitor = () => {
     }, 30000);
 
     return () => {
-      console.log('Cleaning up real-time subscription...');
+      console.log(`Cleaning up real-time subscription for ${network}...`);
       supabase.removeChannel(transferChannel);
       clearInterval(interval);
     };
-  }, [isConnected, notificationsEnabled, toast]);
+  }, [isConnected, network, notificationsEnabled, toast]);
 
-  // Check notification permission on mount and restore monitoring state
+  // Check notification permission on mount
   useEffect(() => {
     if ('Notification' in window) {
       setNotificationsEnabled(Notification.permission === 'granted');
-    }
-    
-    // If monitoring was active, restore data
-    if (isConnected) {
-      console.log('Restoring monitoring state, fetching data...');
-      fetchRecentTransfers();
-      fetchWhaleAlerts();
     }
   }, []);
   
   // Update localStorage when connection state changes
   useEffect(() => {
-    localStorage.setItem('rtm-monitoring-active', String(isConnected));
-  }, [isConnected]);
+    localStorage.setItem(`rtm-monitoring-active-${network}`, String(isConnected));
+  }, [isConnected, network]);
 
   return (
     <div className="space-y-6">
@@ -255,7 +267,7 @@ const RealTimeMonitor = () => {
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
                 <span className="text-sm text-muted-foreground">
-                  {isConnected ? 'Connected' : 'Disconnected'}
+                  {isConnected ? `Connected to ${SUPPORTED_NETWORKS[network]?.name}` : 'Disconnected'}
                 </span>
               </div>
               <Button
@@ -279,10 +291,10 @@ const RealTimeMonitor = () => {
               <Button 
                 onClick={isConnected ? () => {
                   setIsConnected(false);
-                  localStorage.setItem('rtm-monitoring-active', 'false');
+                  localStorage.setItem(`rtm-monitoring-active-${network}`, 'false');
                   toast({
                     title: "Monitoring Stopped",
-                    description: "Real-time transfer monitoring has been stopped",
+                    description: `Real-time transfer monitoring has been stopped on ${SUPPORTED_NETWORKS[network]?.name}`,
                   });
                 } : startMonitoring}
                 disabled={isLoading}
@@ -306,9 +318,19 @@ const RealTimeMonitor = () => {
             </div>
           </CardTitle>
           <CardDescription>
-            Live tracking of large cryptocurrency transfers with whale detection
+            Live tracking of large cryptocurrency transfers with whale detection across multiple blockchains
           </CardDescription>
         </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Select Network</label>
+            <NetworkSelector
+              value={network}
+              onValueChange={setNetwork}
+              className="w-full md:w-64"
+            />
+          </div>
+        </CardContent>
       </Card>
 
       {isConnected && (
@@ -319,6 +341,7 @@ const RealTimeMonitor = () => {
               <CardContent className="p-4">
                 <div className="text-sm text-muted-foreground">Total Transfers</div>
                 <div className="text-2xl font-bold">{stats.totalTransfers}</div>
+                <div className="text-xs text-muted-foreground">{SUPPORTED_NETWORKS[network]?.name}</div>
               </CardContent>
             </Card>
             <Card>
@@ -347,28 +370,28 @@ const RealTimeMonitor = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
                   <AlertTriangle className="w-5 h-5" />
-                  🐋 Recent Whale Alerts
+                  🐋 Recent Whale Alerts on {SUPPORTED_NETWORKS[network]?.name}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                 <div className="space-y-2">
-                   {Array.isArray(whaleAlerts) && whaleAlerts.slice(0, 5).map((alert) => (
-                     <div key={alert.id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border">
-                       <div className="flex items-center gap-3">
-                         <Badge variant="outline" className="border-orange-300">
-                           {alert.currency}
-                         </Badge>
-                         <span className="font-mono text-lg font-bold">
-                           {formatUSD(alert.usd_value)}
-                         </span>
-                       </div>
-                       <div className="text-right text-sm text-muted-foreground">
-                         <div>{truncateAddress(alert.from_address)} → {truncateAddress(alert.to_address)}</div>
-                         <div>{formatTimestamp(alert.timestamp)}</div>
-                       </div>
-                     </div>
-                   ))}
-                 </div>
+                <div className="space-y-2">
+                  {Array.isArray(whaleAlerts) && whaleAlerts.slice(0, 5).map((alert) => (
+                    <div key={alert.id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border">
+                      <div className="flex items-center gap-3">
+                        <Badge variant="outline" className="border-orange-300">
+                          {alert.currency}
+                        </Badge>
+                        <span className="font-mono text-lg font-bold">
+                          {formatUSD(alert.usd_value)}
+                        </span>
+                      </div>
+                      <div className="text-right text-sm text-muted-foreground">
+                        <div>{truncateAddress(alert.from_address)} → {truncateAddress(alert.to_address)}</div>
+                        <div>{formatTimestamp(alert.timestamp)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           )}
@@ -383,7 +406,7 @@ const RealTimeMonitor = () => {
             <TabsContent value="all">
               <Card>
                 <CardHeader>
-                  <CardTitle>Live Transfer Feed</CardTitle>
+                  <CardTitle>Live Transfer Feed - {SUPPORTED_NETWORKS[network]?.name}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="max-h-96 overflow-y-auto">
@@ -398,41 +421,41 @@ const RealTimeMonitor = () => {
                           <TableHead>Status</TableHead>
                         </TableRow>
                       </TableHeader>
-                       <TableBody>
-                         {Array.isArray(transfers) && transfers.map((transfer) => (
-                           <TableRow key={transfer.id}>
-                             <TableCell>
-                               <Badge variant="outline">{transfer.currency}</Badge>
-                             </TableCell>
-                             <TableCell className="font-mono">
-                               {formatUSD(transfer.usd_value)}
-                             </TableCell>
-                             <TableCell className="font-mono">
-                               {truncateAddress(transfer.from_address)}
-                             </TableCell>
-                             <TableCell className="font-mono">
-                               {truncateAddress(transfer.to_address)}
-                             </TableCell>
-                             <TableCell>
-                               {formatTimestamp(transfer.timestamp)}
-                             </TableCell>
-                             <TableCell>
-                               {transfer.is_whale && (
-                                 <Badge variant="secondary" className="bg-orange-100 text-orange-700">
-                                   🐋 Whale
-                                 </Badge>
-                               )}
-                             </TableCell>
-                           </TableRow>
-                         ))}
-                         {(!Array.isArray(transfers) || transfers.length === 0) && (
-                           <TableRow>
-                             <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                               No transfers found. Start monitoring to see live data.
-                             </TableCell>
-                           </TableRow>
-                         )}
-                       </TableBody>
+                      <TableBody>
+                        {Array.isArray(transfers) && transfers.map((transfer) => (
+                          <TableRow key={transfer.id}>
+                            <TableCell>
+                              <Badge variant="outline">{transfer.currency}</Badge>
+                            </TableCell>
+                            <TableCell className="font-mono">
+                              {formatUSD(transfer.usd_value)}
+                            </TableCell>
+                            <TableCell className="font-mono">
+                              {truncateAddress(transfer.from_address)}
+                            </TableCell>
+                            <TableCell className="font-mono">
+                              {truncateAddress(transfer.to_address)}
+                            </TableCell>
+                            <TableCell>
+                              {formatTimestamp(transfer.timestamp)}
+                            </TableCell>
+                            <TableCell>
+                              {transfer.is_whale && (
+                                <Badge variant="secondary" className="bg-orange-100 text-orange-700">
+                                  🐋 Whale
+                                </Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {(!Array.isArray(transfers) || transfers.length === 0) && (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                              No transfers found. Start monitoring to see live data from {SUPPORTED_NETWORKS[network]?.name}.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
                     </Table>
                   </div>
                 </CardContent>
@@ -442,7 +465,7 @@ const RealTimeMonitor = () => {
             <TabsContent value="whales">
               <Card>
                 <CardHeader>
-                  <CardTitle>Whale Transfers ($100k+)</CardTitle>
+                  <CardTitle>Whale Transfers ($100k+) - {SUPPORTED_NETWORKS[network]?.name}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -455,34 +478,34 @@ const RealTimeMonitor = () => {
                         <TableHead>Timestamp</TableHead>
                       </TableRow>
                     </TableHeader>
-                     <TableBody>
-                       {Array.isArray(whaleAlerts) && whaleAlerts.map((whale) => (
-                         <TableRow key={whale.id}>
-                           <TableCell>
-                             <Badge variant="outline">{whale.currency}</Badge>
-                           </TableCell>
-                           <TableCell className="font-mono font-bold text-orange-600">
-                             {formatUSD(whale.usd_value)}
-                           </TableCell>
-                           <TableCell className="font-mono">
-                             {truncateAddress(whale.from_address)}
-                           </TableCell>
-                           <TableCell className="font-mono">
-                             {truncateAddress(whale.to_address)}
-                           </TableCell>
-                           <TableCell>
-                             {formatTimestamp(whale.timestamp)}
-                           </TableCell>
-                         </TableRow>
-                       ))}
-                       {(!Array.isArray(whaleAlerts) || whaleAlerts.length === 0) && (
-                         <TableRow>
-                           <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                             No whale transfers detected yet.
-                           </TableCell>
-                         </TableRow>
-                       )}
-                     </TableBody>
+                    <TableBody>
+                      {Array.isArray(whaleAlerts) && whaleAlerts.map((whale) => (
+                        <TableRow key={whale.id}>
+                          <TableCell>
+                            <Badge variant="outline">{whale.currency}</Badge>
+                          </TableCell>
+                          <TableCell className="font-mono font-bold text-orange-600">
+                            {formatUSD(whale.usd_value)}
+                          </TableCell>
+                          <TableCell className="font-mono">
+                            {truncateAddress(whale.from_address)}
+                          </TableCell>
+                          <TableCell className="font-mono">
+                            {truncateAddress(whale.to_address)}
+                          </TableCell>
+                          <TableCell>
+                            {formatTimestamp(whale.timestamp)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {(!Array.isArray(whaleAlerts) || whaleAlerts.length === 0) && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                            No whale transfers detected yet on {SUPPORTED_NETWORKS[network]?.name}.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
                   </Table>
                 </CardContent>
               </Card>

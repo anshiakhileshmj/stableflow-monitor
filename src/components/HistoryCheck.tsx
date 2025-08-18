@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, CalendarIcon, Loader2, ExternalLink, TrendingUp, TrendingDown, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +12,8 @@ import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import AddressDisplay from "@/components/AddressDisplay";
+import NetworkSelector from "@/components/NetworkSelector";
+import { SUPPORTED_NETWORKS } from '@/lib/networks';
 
 interface Transaction {
   Transaction: {
@@ -50,7 +51,7 @@ interface Analytics {
 
 const HistoryCheck = () => {
   const [walletAddress, setWalletAddress] = useState("");
-  const [network, setNetwork] = useState("eth");
+  const [network, setNetwork] = useState("ethereum");
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -86,7 +87,7 @@ const HistoryCheck = () => {
 
     setIsLoading(true);
     try {
-      console.log('🔍 Fetching wallet history for:', walletAddress);
+      console.log(`🔍 Fetching wallet history for: ${walletAddress} on ${network}`);
       console.log('📅 Date range:', { startDate, endDate });
 
       const { data, error } = await supabase.functions.invoke('wallet-history', {
@@ -102,20 +103,20 @@ const HistoryCheck = () => {
       if (error) throw error;
 
       const txData = data?.data?.EVM?.Transactions || [];
-      console.log('✅ Fetched transactions:', txData.length);
+      console.log(`✅ Fetched transactions from ${network}:`, txData.length);
       
       setTransactions(txData);
       calculateAnalytics(txData, walletAddress.trim());
 
       toast({
         title: "Success",
-        description: `Fetched ${txData.length} transactions for analysis`,
+        description: `Fetched ${txData.length} transactions from ${SUPPORTED_NETWORKS[network]?.name || network} for analysis`,
       });
     } catch (error) {
-      console.error('❌ Failed to fetch wallet history:', error);
+      console.error(`❌ Failed to fetch wallet history from ${network}:`, error);
       toast({
         title: "Error",
-        description: `Failed to fetch wallet history: ${error.message}`,
+        description: `Failed to fetch wallet history from ${SUPPORTED_NETWORKS[network]?.name || network}: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -136,15 +137,16 @@ const HistoryCheck = () => {
       tx.Transaction.To?.toLowerCase() === address.toLowerCase()
     );
 
-    // Convert Wei to ETH properly
+    // Convert Wei to native token properly (XRP uses different decimal places)
+    const decimals = network === 'xrp' ? 1000000 : 1e18;
     const totalSent = sent.reduce((sum, tx) => 
-      sum + parseFloat(tx.Transaction.Value || '0') / 1e18, 0
+      sum + parseFloat(tx.Transaction.Value || '0') / decimals, 0
     );
     const totalReceived = received.reduce((sum, tx) => 
-      sum + parseFloat(tx.Transaction.Value || '0') / 1e18, 0
+      sum + parseFloat(tx.Transaction.Value || '0') / decimals, 0
     );
     const totalFees = sent.reduce((sum, tx) => 
-      sum + parseFloat(tx.Fee?.SenderFee || '0') / 1e18, 0
+      sum + parseFloat(tx.Fee?.SenderFee || '0') / decimals, 0
     );
 
     const analyticsData: Analytics = {
@@ -167,18 +169,27 @@ const HistoryCheck = () => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const formatEth = (value: number | string) => {
+  const formatToken = (value: number | string) => {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     if (typeof value === 'string' && value.length > 10) {
-      // If it's a Wei value (long string), convert to ETH
-      return (numValue / 1e18).toFixed(6);
+      // Convert from smallest unit to main token
+      const decimals = network === 'xrp' ? 1000000 : 1e18;
+      return (numValue / decimals).toFixed(6);
     }
-    // If it's already in ETH
     return numValue.toFixed(6);
   };
 
   const formatTimestamp = (timestamp: string) => {
     return new Date(timestamp).toLocaleString();
+  };
+
+  const getExplorerUrl = (hash: string) => {
+    const networkConfig = SUPPORTED_NETWORKS[network];
+    return networkConfig ? `${networkConfig.explorerUrl}/tx/${hash}` : '#';
+  };
+
+  const getNativeSymbol = () => {
+    return SUPPORTED_NETWORKS[network]?.nativeCurrency.symbol || 'TOKEN';
   };
 
   return (
@@ -190,7 +201,7 @@ const HistoryCheck = () => {
             Wallet Historical Analysis
           </CardTitle>
           <CardDescription>
-            Analyze complete transaction history for any wallet address within a specific time period
+            Analyze complete transaction history for any wallet address within a specific time period across multiple blockchains
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -198,7 +209,7 @@ const HistoryCheck = () => {
             <div className="space-y-2">
               <label className="text-sm font-medium">Wallet Address</label>
               <Input
-                placeholder="Enter wallet address (0x...)"
+                placeholder="Enter wallet address (0x... or XRP address)"
                 value={walletAddress}
                 onChange={(e) => setWalletAddress(e.target.value)}
                 className="font-mono"
@@ -206,17 +217,10 @@ const HistoryCheck = () => {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Network</label>
-              <Select value={network} onValueChange={setNetwork}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="eth">Ethereum</SelectItem>
-                  <SelectItem value="bsc">BSC</SelectItem>
-                  <SelectItem value="polygon">Polygon</SelectItem>
-                  <SelectItem value="arbitrum">Arbitrum</SelectItem>
-                </SelectContent>
-              </Select>
+              <NetworkSelector
+                value={network}
+                onValueChange={setNetwork}
+              />
             </div>
           </div>
 
@@ -302,7 +306,7 @@ const HistoryCheck = () => {
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analyzing History...
+                Analyzing History on {SUPPORTED_NETWORKS[network]?.name}...
               </>
             ) : (
               <>
@@ -319,7 +323,7 @@ const HistoryCheck = () => {
           <CardHeader>
             <CardTitle>Analysis Results</CardTitle>
             <CardDescription>
-              Transaction analysis for <AddressDisplay address={walletAddress} />
+              Transaction analysis for <AddressDisplay address={walletAddress} /> on {SUPPORTED_NETWORKS[network]?.name}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -346,7 +350,7 @@ const HistoryCheck = () => {
                     {analytics.sentTransactions.toLocaleString()}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {formatEth(analytics.totalSent)} ETH
+                    {formatToken(analytics.totalSent)} {getNativeSymbol()}
                   </div>
                 </CardContent>
               </Card>
@@ -361,7 +365,7 @@ const HistoryCheck = () => {
                     {analytics.receivedTransactions.toLocaleString()}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {formatEth(analytics.totalReceived)} ETH
+                    {formatToken(analytics.totalReceived)} {getNativeSymbol()}
                   </div>
                 </CardContent>
               </Card>
@@ -370,10 +374,10 @@ const HistoryCheck = () => {
                 <CardContent className="p-4">
                   <div className="text-sm text-muted-foreground">Net Flow</div>
                   <div className={`text-2xl font-bold mt-2 ${analytics.netFlow >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    {analytics.netFlow >= 0 ? '+' : ''}{formatEth(analytics.netFlow)} ETH
+                    {analytics.netFlow >= 0 ? '+' : ''}{formatToken(analytics.netFlow)} {getNativeSymbol()}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Fees: {formatEth(analytics.totalFees)} ETH
+                    Fees: {formatToken(analytics.totalFees)} {getNativeSymbol()}
                   </div>
                 </CardContent>
               </Card>
@@ -387,7 +391,7 @@ const HistoryCheck = () => {
           <CardHeader>
             <CardTitle>Transaction History</CardTitle>
             <CardDescription>
-              {transactions.length} transactions found
+              {transactions.length} transactions found on {SUPPORTED_NETWORKS[network]?.name}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -399,7 +403,7 @@ const HistoryCheck = () => {
                     <TableHead>Time</TableHead>
                     <TableHead>From</TableHead>
                     <TableHead>To</TableHead>
-                    <TableHead>Value (ETH)</TableHead>
+                    <TableHead>Value ({getNativeSymbol()})</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
@@ -420,7 +424,7 @@ const HistoryCheck = () => {
                         <AddressDisplay address={tx.Transaction.To || ''} />
                       </TableCell>
                       <TableCell className="font-mono">
-                        {formatEth(parseFloat(tx.Transaction.Value || '0'))}
+                        {formatToken(parseFloat(tx.Transaction.Value || '0'))}
                       </TableCell>
                       <TableCell>
                         <Badge variant={tx.TransactionStatus?.Success ? "default" : "destructive"}>
@@ -430,7 +434,7 @@ const HistoryCheck = () => {
                       <TableCell>
                         <Button variant="ghost" size="sm" asChild>
                           <a
-                            href={`https://etherscan.io/tx/${tx.Transaction.Hash}`}
+                            href={getExplorerUrl(tx.Transaction.Hash)}
                             target="_blank"
                             rel="noopener noreferrer"
                           >

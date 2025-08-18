@@ -1,9 +1,33 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const SUPPORTED_NETWORKS: Record<string, { apiEndpoint: string; explorerUrl: string; isEVM: boolean }> = {
+  ethereum: {
+    apiEndpoint: 'https://api.etherscan.io/api',
+    explorerUrl: 'https://etherscan.io',
+    isEVM: true,
+  },
+  polygon: {
+    apiEndpoint: 'https://api.polygonscan.com/api',
+    explorerUrl: 'https://polygonscan.com',
+    isEVM: true,
+  },
+  avalanche: {
+    apiEndpoint: 'https://api.snowtrace.io/api',
+    explorerUrl: 'https://snowtrace.io',
+    isEVM: true,
+  },
+  arbitrum: {
+    apiEndpoint: 'https://api.arbiscan.io/api',
+    explorerUrl: 'https://arbiscan.io',
+    isEVM: true,
+  },
 };
 
 serve(async (req) => {
@@ -13,10 +37,20 @@ serve(async (req) => {
   }
 
   try {
-    const { walletAddress } = await req.json();
+    const { walletAddress, network = 'ethereum' } = await req.json();
     
     if (!walletAddress) {
       throw new Error('Wallet address is required');
+    }
+
+    const networkConfig = SUPPORTED_NETWORKS[network];
+    if (!networkConfig) {
+      throw new Error(`Unsupported network: ${network}`);
+    }
+
+    // XRP requires different handling
+    if (network === 'xrp') {
+      return await handleXRPAnalysis(walletAddress);
     }
 
     const etherscanApiKey = Deno.env.get('ETHERSCAN_API_KEY');
@@ -29,21 +63,13 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log(`Analyzing wallet: ${walletAddress}`);
+    console.log(`Analyzing wallet: ${walletAddress} on ${network}`);
 
-    console.log(`Fetching detailed wallet info for: ${walletAddress}`);
-
-    // Fetch transactions from Etherscan (limit to 100)
-    const etherscanUrl = `https://api.etherscan.io/api?module=account&action=txlist&address=${walletAddress}&startblock=0&endblock=99999999&page=1&offset=100&sort=desc&apikey=${etherscanApiKey}`;
-    
-    // Fetch account balance
-    const balanceUrl = `https://api.etherscan.io/api?module=account&action=balance&address=${walletAddress}&tag=latest&apikey=${etherscanApiKey}`;
-    
-    // Fetch internal transactions
-    const internalTxUrl = `https://api.etherscan.io/api?module=account&action=txlistinternal&address=${walletAddress}&startblock=0&endblock=99999999&page=1&offset=50&sort=desc&apikey=${etherscanApiKey}`;
-    
-    // Fetch ERC20 token transfers
-    const tokenTransfersUrl = `https://api.etherscan.io/api?module=account&action=tokentx&address=${walletAddress}&startblock=0&endblock=99999999&page=1&offset=50&sort=desc&apikey=${etherscanApiKey}`;
+    // Use network-specific API endpoints
+    const etherscanUrl = `${networkConfig.apiEndpoint}?module=account&action=txlist&address=${walletAddress}&startblock=0&endblock=99999999&page=1&offset=100&sort=desc&apikey=${etherscanApiKey}`;
+    const balanceUrl = `${networkConfig.apiEndpoint}?module=account&action=balance&address=${walletAddress}&tag=latest&apikey=${etherscanApiKey}`;
+    const internalTxUrl = `${networkConfig.apiEndpoint}?module=account&action=txlistinternal&address=${walletAddress}&startblock=0&endblock=99999999&page=1&offset=50&sort=desc&apikey=${etherscanApiKey}`;
+    const tokenTransfersUrl = `${networkConfig.apiEndpoint}?module=account&action=tokentx&address=${walletAddress}&startblock=0&endblock=99999999&page=1&offset=50&sort=desc&apikey=${etherscanApiKey}`;
 
     const [etherscanResponse, balanceResponse, internalTxResponse, tokenTransfersResponse] = await Promise.all([
       fetch(etherscanUrl),
@@ -60,7 +86,7 @@ serve(async (req) => {
     ]);
 
     if (etherscanData.status !== '1') {
-      throw new Error(`Etherscan API error: ${etherscanData.message}`);
+      throw new Error(`${network} API error: ${etherscanData.message}`);
     }
 
     const transactions = etherscanData.result;
@@ -68,19 +94,19 @@ serve(async (req) => {
     const internalTransactions = internalTxData.status === '1' ? internalTxData.result : [];
     const tokenTransfers = tokenTransfersData.status === '1' ? tokenTransfersData.result : [];
 
-    console.log(`Found ${transactions.length} transactions, ${internalTransactions.length} internal txs, ${tokenTransfers.length} token transfers`);
+    console.log(`Found ${transactions.length} transactions, ${internalTransactions.length} internal txs, ${tokenTransfers.length} token transfers on ${network}`);
 
     // Process and format transactions
     const processedTransactions = transactions.map((tx: any) => ({
       hash: tx.hash,
       timestamp: new Date(parseInt(tx.timeStamp) * 1000),
-      value: (parseFloat(tx.value) / 1e18).toFixed(6), // Convert wei to ETH
+      value: (parseFloat(tx.value) / 1e18).toFixed(6), // Convert wei to native token
       from: tx.from,
       to: tx.to,
       isError: tx.isError === '1'
     }));
 
-    // Calculate wallet risk metrics
+    // Calculate wallet risk metrics (same logic for all EVM chains)
     const totalTxs = transactions.length;
     const failedTxs = transactions.filter((tx: any) => tx.isError === '1').length;
     const failedRatio = totalTxs > 0 ? (failedTxs / totalTxs) : 0;
@@ -111,7 +137,7 @@ serve(async (req) => {
     
     const riskLevel = riskScore <= 3 ? 'LOW' : riskScore <= 6 ? 'MEDIUM' : 'HIGH';
 
-    // Store transactions in database
+    // Store transactions in database with network info
     if (processedTransactions.length > 0) {
       const transactionsToInsert = processedTransactions.map((tx: any) => ({
         wallet_address: walletAddress.toLowerCase(),
@@ -120,7 +146,8 @@ serve(async (req) => {
         value_eth: parseFloat(tx.value),
         from_address: tx.from,
         to_address: tx.to,
-        is_error: tx.isError
+        is_error: tx.isError,
+        network: network
       }));
 
       // Insert transactions (ignore conflicts)
@@ -133,7 +160,7 @@ serve(async (req) => {
       }
     }
 
-    // Store or update risk rating
+    // Store or update risk rating with network info
     const riskData = {
       wallet_address: walletAddress.toLowerCase(),
       first_tx_date: firstTxDate,
@@ -143,6 +170,7 @@ serve(async (req) => {
       failed_tx_ratio: failedRatio,
       risk_score: riskScore,
       risk_level: riskLevel,
+      network: network,
       last_updated: new Date()
     };
 
@@ -156,7 +184,8 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       walletAddress,
-      transactions: processedTransactions, // Return all 100 transactions
+      network,
+      transactions: processedTransactions,
       balance: balance,
       internalTransactions: internalTransactions.slice(0, 20),
       tokenTransfers: tokenTransfers.slice(0, 20),
@@ -182,3 +211,87 @@ serve(async (req) => {
     });
   }
 });
+
+async function handleXRPAnalysis(walletAddress: string) {
+  try {
+    console.log(`Analyzing XRP wallet: ${walletAddress}`);
+    
+    // XRP Ledger API calls
+    const accountInfoUrl = `https://api.xrpscan.com/api/v1/account/${walletAddress}`;
+    const transactionsUrl = `https://api.xrpscan.com/api/v1/account/${walletAddress}/transactions`;
+
+    const [accountResponse, transactionsResponse] = await Promise.all([
+      fetch(accountInfoUrl),
+      fetch(transactionsUrl)
+    ]);
+
+    const [accountData, transactionsData] = await Promise.all([
+      accountResponse.json(),
+      transactionsResponse.json()
+    ]);
+
+    const transactions = Array.isArray(transactionsData) ? transactionsData : [];
+    const balance = accountData?.Balance ? (parseFloat(accountData.Balance) / 1000000).toFixed(6) : '0';
+
+    // Process transactions for XRP
+    const processedTransactions = transactions.slice(0, 100).map((tx: any) => ({
+      hash: tx.hash,
+      timestamp: new Date(tx.date),
+      value: tx.Amount ? (parseFloat(tx.Amount) / 1000000).toFixed(6) : '0',
+      from: tx.Account || walletAddress,
+      to: tx.Destination || '',
+      isError: tx.meta?.TransactionResult !== 'tesSUCCESS'
+    }));
+
+    // Calculate risk metrics for XRP
+    const totalTxs = transactions.length;
+    const failedTxs = transactions.filter((tx: any) => tx.meta?.TransactionResult !== 'tesSUCCESS').length;
+    const failedRatio = totalTxs > 0 ? (failedTxs / totalTxs) : 0;
+    
+    const oldestTx = transactions.length > 0 ? transactions[transactions.length - 1] : null;
+    const firstTxDate = oldestTx ? new Date(oldestTx.date) : null;
+    const walletAgeDays = firstTxDate ? Math.floor((Date.now() - firstTxDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+
+    let riskScore = 1;
+    if (walletAgeDays < 30) riskScore += 3;
+    else if (walletAgeDays < 90) riskScore += 2;
+    else if (walletAgeDays < 365) riskScore += 1;
+    
+    if (totalTxs < 10) riskScore += 2;
+    else if (totalTxs < 50) riskScore += 1;
+    
+    if (failedRatio > 0.1) riskScore += 2;
+    else if (failedRatio > 0.05) riskScore += 1;
+    
+    riskScore = Math.min(riskScore, 10);
+    const riskLevel = riskScore <= 3 ? 'LOW' : riskScore <= 6 ? 'MEDIUM' : 'HIGH';
+
+    return new Response(JSON.stringify({
+      walletAddress,
+      network: 'xrp',
+      transactions: processedTransactions,
+      balance: balance,
+      internalTransactions: [],
+      tokenTransfers: [],
+      riskAnalysis: {
+        totalTransactions: totalTxs,
+        failedTransactions: failedTxs,
+        failedTransactionRatio: failedRatio,
+        walletAgeDays,
+        riskScore,
+        riskLevel
+      }
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('Error analyzing XRP wallet:', error);
+    return new Response(JSON.stringify({ 
+      error: 'Failed to analyze XRP wallet' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+}
