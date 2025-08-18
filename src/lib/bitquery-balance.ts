@@ -34,10 +34,13 @@ class BitqueryBalanceService {
     try {
       const addresses = wallets.map(w => w.address);
       
-      const response = await fetch('/functions/v1/bitquery-balance', {
+      console.log('🔍 Calling edge function with addresses:', addresses);
+      
+      const response = await fetch(`https://tnwgnaneejkknokwpkwa.supabase.co/functions/v1/bitquery-balance`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRud2duYW5lZWpra25va3dwa3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNDQ0NTEsImV4cCI6MjA3MDkyMDQ1MX0.G9NSvp59zg0pNEPWA8c5qECnfvri9MYUEJyqpUk2ILQ`
         },
         body: JSON.stringify({
           addresses,
@@ -45,12 +48,16 @@ class BitqueryBalanceService {
         })
       });
 
+      console.log('📡 Edge function response status:', response.status);
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ Edge function error response:', errorText);
+        throw new Error(`Edge function failed: ${response.status} - ${errorText}`);
       }
 
       const balanceData = await response.json();
+      console.log('✅ Edge function returned data:', balanceData);
       return balanceData;
     } catch (error) {
       console.error('❌ Balance query failed:', error);
