@@ -1,4 +1,3 @@
-
 export interface NetworkConfig {
   id: string;
   name: string;
@@ -10,6 +9,8 @@ export interface NetworkConfig {
   apiEndpoint: string;
   explorerUrl: string;
   isEVM: boolean;
+  // Add BitQuery network identifier for balance queries
+  bitqueryId: string;
 }
 
 export const SUPPORTED_NETWORKS: Record<string, NetworkConfig> = {
@@ -24,6 +25,7 @@ export const SUPPORTED_NETWORKS: Record<string, NetworkConfig> = {
     apiEndpoint: 'https://api.etherscan.io/api',
     explorerUrl: 'https://etherscan.io',
     isEVM: true,
+    bitqueryId: 'eth',
   },
   polygon: {
     id: 'polygon',
@@ -36,6 +38,7 @@ export const SUPPORTED_NETWORKS: Record<string, NetworkConfig> = {
     apiEndpoint: 'https://api.polygonscan.com/api',
     explorerUrl: 'https://polygonscan.com',
     isEVM: true,
+    bitqueryId: 'polygon',
   },
   avalanche: {
     id: 'avalanche',
@@ -48,6 +51,7 @@ export const SUPPORTED_NETWORKS: Record<string, NetworkConfig> = {
     apiEndpoint: 'https://api.snowtrace.io/api',
     explorerUrl: 'https://snowtrace.io',
     isEVM: true,
+    bitqueryId: 'avalanche',
   },
   arbitrum: {
     id: 'arbitrum',
@@ -60,6 +64,7 @@ export const SUPPORTED_NETWORKS: Record<string, NetworkConfig> = {
     apiEndpoint: 'https://api.arbiscan.io/api',
     explorerUrl: 'https://arbiscan.io',
     isEVM: true,
+    bitqueryId: 'arbitrum',
   },
   xrp: {
     id: 'xrp',
@@ -72,6 +77,7 @@ export const SUPPORTED_NETWORKS: Record<string, NetworkConfig> = {
     apiEndpoint: 'https://api.xrpscan.com/api/v1',
     explorerUrl: 'https://xrpscan.com',
     isEVM: false,
+    bitqueryId: 'xrp',
   },
 };
 

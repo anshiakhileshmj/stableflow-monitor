@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { bitqueryBalanceService } from '@/lib/bitquery-balance';
+import { SUPPORTED_NETWORKS } from '@/lib/networks';
 
 interface TokenBalance {
   amount: string;
@@ -40,7 +41,9 @@ export const useRealTimeBalance = (wallets: WalletData[], network: string) => {
 
     try {
       console.log('🔍 Fetching balances for wallets:', wallets.map(w => w.address));
-      const balanceData = await bitqueryBalanceService.getCurrentBalances(wallets, network);
+      // Use the BitQuery network ID instead of the frontend network ID
+      const bitqueryNetworkId = SUPPORTED_NETWORKS[network]?.bitqueryId || 'eth';
+      const balanceData = await bitqueryBalanceService.getCurrentBalances(wallets, bitqueryNetworkId);
       setBalances(balanceData);
       setLastUpdate(new Date());
       console.log('✅ Balances updated:', balanceData);
@@ -76,8 +79,9 @@ export const useRealTimeBalance = (wallets: WalletData[], network: string) => {
       // Add balance update listener
       bitqueryBalanceService.addBalanceListener(handleBalanceUpdate);
 
-      // Subscribe to real-time updates (currently a placeholder)
-      subscriptionRef.current = bitqueryBalanceService.subscribeToBalanceUpdates(wallets, network);
+      // Subscribe to real-time updates (currently a placeholder) - use BitQuery network ID
+      const bitqueryNetworkId = SUPPORTED_NETWORKS[network]?.bitqueryId || 'eth';
+      subscriptionRef.current = bitqueryBalanceService.subscribeToBalanceUpdates(wallets, bitqueryNetworkId);
 
       // Fetch initial balances
       await fetchBalances();

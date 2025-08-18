@@ -6,6 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { Loader2, X, Coins } from 'lucide-react';
 import { formatAddress, formatBalance } from '@/utils/formatters';
 import AddressDisplay from '@/components/AddressDisplay';
+import { SUPPORTED_NETWORKS } from '@/lib/networks';
 
 interface TokenBalance {
   amount: string;
@@ -48,21 +49,16 @@ const WalletBalanceCard: React.FC<WalletBalanceCardProps> = ({
   const { address, name, network } = wallet;
 
   const getNativeTokenSymbol = (network: string) => {
-    switch (network) {
-      case 'eth': return 'ETH';
-      case 'bsc': return 'BNB';
-      case 'polygon': return 'MATIC';
-      case 'arbitrum': return 'ETH';
-      default: return 'ETH';
-    }
+    return SUPPORTED_NETWORKS[network]?.nativeCurrency.symbol || 'ETH';
   };
 
   const getNetworkColor = (network: string) => {
     switch (network) {
-      case 'eth': return 'bg-blue-100 text-blue-800';
-      case 'bsc': return 'bg-yellow-100 text-yellow-800';
+      case 'ethereum': return 'bg-blue-100 text-blue-800';
       case 'polygon': return 'bg-purple-100 text-purple-800';
+      case 'avalanche': return 'bg-red-100 text-red-800';
       case 'arbitrum': return 'bg-cyan-100 text-cyan-800';
+      case 'xrp': return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -80,7 +76,7 @@ const WalletBalanceCard: React.FC<WalletBalanceCardProps> = ({
               variant="secondary" 
               className={`text-xs ${getNetworkColor(network)}`}
             >
-              {network.toUpperCase()}
+              {SUPPORTED_NETWORKS[network]?.name || network.toUpperCase()}
             </Badge>
           </div>
           <Button
