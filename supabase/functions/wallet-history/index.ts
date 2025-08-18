@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { walletAddress, network = 'eth', startDate, endDate, limit = 100 } = await req.json()
+    const { walletAddress, startDate, endDate, limit = 100 } = await req.json()
     
     if (!walletAddress || !startDate || !endDate) {
       return new Response(
@@ -21,85 +21,75 @@ serve(async (req) => {
       )
     }
 
-    const bitqueryToken = Deno.env.get('BITQUERY_TOKEN')
-    if (!bitqueryToken) {
+    const etherscanApiKey = Deno.env.get('ETHERSCAN_API_KEY')
+    if (!etherscanApiKey) {
       return new Response(
-        JSON.stringify({ error: 'Bitquery token not configured' }),
+        JSON.stringify({ error: 'Etherscan API key not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     console.log('🔍 Fetching wallet history for:', walletAddress, 'from', startDate, 'to', endDate)
 
-    const query = `
-      query WalletHistory($address: String!, $startDate: String, $endDate: String, $limit: Int) {
-        EVM(dataset: combined, network: ${network}) {
-          Transactions(
-            where: {
-              any: [
-                {Transaction: {From: {is: $address}}},
-                {Transaction: {To: {is: $address}}}
-              ],
-              Block: {Date: {since: $startDate, till: $endDate}}
-            }
-            orderBy: {descending: Block_Time}
-            limit: {count: $limit}
-          ) {
-            Transaction {
-              Hash
-              From
-              To
-              Value
-              Gas
-              GasPrice
-              Cost
-            }
-            Block {
-              Number
-              Time
-              Date
-            }
-            Fee {
-              SenderFee
-            }
-            TransactionStatus {
-              Success
-            }
-          }
-        }
-      }
-    `
+    // Convert dates to timestamps
+    const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000)
+    const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000)
 
-    const response = await fetch('https://streaming.bitquery.io/graphql', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-KEY': bitqueryToken,
-        'Authorization': `Bearer ${bitqueryToken}`
-      },
-      body: JSON.stringify({
-        query,
-        variables: { 
-          address: walletAddress.toLowerCase(), 
-          startDate: startDate.split('T')[0], // Convert to YYYY-MM-DD format
-          endDate: endDate.split('T')[0],     // Convert to YYYY-MM-DD format
-          limit 
-        }
-      })
-    })
-
-    const result = await response.json()
+    // Fetch normal transactions
+    const normalTxUrl = `https://api.etherscan.io/api?module=account&action=txlist&address=${walletAddress}&startblock=0&endblock=99999999&page=1&offset=${limit}&sort=desc&apikey=${etherscanApiKey}`
     
-    if (result.errors) {
-      console.error('Bitquery errors:', result.errors)
+    console.log('📡 Calling Etherscan API for normal transactions')
+    const normalTxResponse = await fetch(normalTxUrl)
+    const normalTxData = await normalTxResponse.json()
+
+    if (normalTxData.status !== '1') {
+      console.error('Etherscan API error:', normalTxData.message)
       return new Response(
-        JSON.stringify({ error: result.errors[0].message }),
+        JSON.stringify({ error: normalTxData.message || 'Failed to fetch transactions' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const transactionCount = result.data?.EVM?.Transactions?.length || 0
-    console.log('✅ Fetched', transactionCount, 'transactions')
+    // Filter transactions by timestamp
+    const filteredTransactions = normalTxData.result.filter(tx => {
+      const txTimestamp = parseInt(tx.timeStamp)
+      return txTimestamp >= startTimestamp && txTimestamp <= endTimestamp
+    })
+
+    // Transform to match our expected format
+    const transformedTransactions = filteredTransactions.map(tx => ({
+      Transaction: {
+        Hash: tx.hash,
+        From: tx.from,
+        To: tx.to,
+        Value: tx.value, // This is in Wei
+        Gas: tx.gas,
+        GasPrice: tx.gasPrice,
+        Cost: (parseInt(tx.gasUsed) * parseInt(tx.gasPrice)).toString()
+      },
+      Block: {
+        Number: parseInt(tx.blockNumber),
+        Time: new Date(parseInt(tx.timeStamp) * 1000).toISOString(),
+        Date: new Date(parseInt(tx.timeStamp) * 1000).toISOString().split('T')[0]
+      },
+      Fee: {
+        SenderFee: (parseInt(tx.gasUsed) * parseInt(tx.gasPrice)).toString()
+      },
+      TransactionStatus: {
+        Success: tx.txreceipt_status === '1'
+      }
+    }))
+
+    const transactionCount = transformedTransactions.length
+    console.log('✅ Fetched and filtered', transactionCount, 'transactions')
+
+    const result = {
+      data: {
+        EVM: {
+          Transactions: transformedTransactions
+        }
+      }
+    }
 
     return new Response(
       JSON.stringify(result),

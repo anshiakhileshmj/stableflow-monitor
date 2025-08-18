@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -136,14 +135,15 @@ const HistoryCheck = () => {
       tx.Transaction.To?.toLowerCase() === address.toLowerCase()
     );
 
+    // Convert Wei to ETH properly
     const totalSent = sent.reduce((sum, tx) => 
-      sum + parseFloat(tx.Transaction.Value || '0'), 0
+      sum + parseFloat(tx.Transaction.Value || '0') / 1e18, 0
     );
     const totalReceived = received.reduce((sum, tx) => 
-      sum + parseFloat(tx.Transaction.Value || '0'), 0
+      sum + parseFloat(tx.Transaction.Value || '0') / 1e18, 0
     );
     const totalFees = sent.reduce((sum, tx) => 
-      sum + parseFloat(tx.Fee?.SenderFee || '0'), 0
+      sum + parseFloat(tx.Fee?.SenderFee || '0') / 1e18, 0
     );
 
     const analyticsData: Analytics = {
@@ -166,8 +166,14 @@ const HistoryCheck = () => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const formatEth = (value: number) => {
-    return (value / 1e18).toFixed(6);
+  const formatEth = (value: number | string) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    if (typeof value === 'string' && value.length > 10) {
+      // If it's a Wei value (long string), convert to ETH
+      return (numValue / 1e18).toFixed(6);
+    }
+    // If it's already in ETH
+    return numValue.toFixed(6);
   };
 
   const formatTimestamp = (timestamp: string) => {
