@@ -32,7 +32,7 @@ serve(async (req) => {
     console.log('🔍 Fetching wallet history for:', walletAddress, 'from', startDate, 'to', endDate)
 
     const query = `
-      query WalletHistory($address: String!, $startDate: ISO8601DateTime, $endDate: ISO8601DateTime, $limit: Int) {
+      query WalletHistory($address: String!, $startDate: DateTime, $endDate: DateTime, $limit: Int) {
         EVM(dataset: combined, network: ${network}) {
           Transactions(
             where: {
@@ -53,7 +53,6 @@ serve(async (req) => {
               Gas
               GasPrice
               Cost
-              Success
             }
             Block {
               Number
@@ -62,6 +61,9 @@ serve(async (req) => {
             }
             Fee {
               SenderFee
+            }
+            TransactionStatus {
+              Success
             }
           }
         }

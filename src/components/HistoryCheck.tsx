@@ -23,7 +23,6 @@ interface Transaction {
     Gas: string;
     GasPrice: string;
     Cost: string;
-    Success: boolean;
   };
   Block: {
     Number: number;
@@ -32,6 +31,9 @@ interface Transaction {
   };
   Fee: {
     SenderFee: string;
+  };
+  TransactionStatus: {
+    Success: boolean;
   };
 }
 
@@ -414,8 +416,8 @@ const HistoryCheck = () => {
                         {formatEth(parseFloat(tx.Transaction.Value || '0'))}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={tx.Transaction.Success ? "default" : "destructive"}>
-                          {tx.Transaction.Success ? 'Success' : 'Failed'}
+                        <Badge variant={tx.TransactionStatus?.Success ? "default" : "destructive"}>
+                          {tx.TransactionStatus?.Success ? 'Success' : 'Failed'}
                         </Badge>
                       </TableCell>
                       <TableCell>
