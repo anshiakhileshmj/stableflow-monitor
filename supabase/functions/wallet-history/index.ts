@@ -32,7 +32,7 @@ serve(async (req) => {
     console.log('🔍 Fetching wallet history for:', walletAddress, 'from', startDate, 'to', endDate)
 
     const query = `
-      query WalletHistory($address: String!, $startDate: DateTime, $endDate: DateTime, $limit: Int) {
+      query WalletHistory($address: String!, $startDate: String, $endDate: String, $limit: Int) {
         EVM(dataset: combined, network: ${network}) {
           Transactions(
             where: {
@@ -81,8 +81,8 @@ serve(async (req) => {
         query,
         variables: { 
           address: walletAddress.toLowerCase(), 
-          startDate, 
-          endDate, 
+          startDate: startDate.split('T')[0], // Convert to YYYY-MM-DD format
+          endDate: endDate.split('T')[0],     // Convert to YYYY-MM-DD format
           limit 
         }
       })
