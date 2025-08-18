@@ -7,13 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Wallet, TrendingUp, Radio } from 'lucide-react';
+import { SUPPORTED_NETWORKS } from '@/lib/networks';
 import WalletBalanceCard from './WalletBalanceCard';
 import AddWalletForm from './AddWalletForm';
-
-interface Network {
-  value: string;
-  label: string;
-}
 
 interface WalletData {
   id: string;
@@ -23,7 +19,7 @@ interface WalletData {
 }
 
 const BalanceTracker = () => {
-  const [selectedNetwork, setSelectedNetwork] = useState('eth');
+  const [selectedNetwork, setSelectedNetwork] = useState('ethereum');
   const { 
     wallets, 
     addWallet, 
@@ -38,13 +34,6 @@ const BalanceTracker = () => {
     startTracking,
     stopTracking 
   } = useRealTimeBalance(wallets, selectedNetwork);
-
-  const networks: Network[] = [
-    { value: 'eth', label: 'Ethereum' },
-    { value: 'bsc', label: 'BSC' },
-    { value: 'polygon', label: 'Polygon' },
-    { value: 'arbitrum', label: 'Arbitrum' }
-  ];
 
   // Start tracking when wallets are loaded
   useEffect(() => {
@@ -95,13 +84,18 @@ const BalanceTracker = () => {
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium">Network:</label>
               <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-56">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {networks.map(network => (
-                    <SelectItem key={network.value} value={network.value}>
-                      {network.label}
+                  {Object.values(SUPPORTED_NETWORKS).map(network => (
+                    <SelectItem key={network.id} value={network.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{network.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({network.nativeCurrency.symbol})
+                        </span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -145,7 +139,9 @@ const BalanceTracker = () => {
             <div className="flex items-center gap-2">
               <Radio className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Network:</span>
-              <Badge variant="outline">{selectedNetwork.toUpperCase()}</Badge>
+              <Badge variant="outline">
+                {SUPPORTED_NETWORKS[selectedNetwork]?.name || selectedNetwork.toUpperCase()}
+              </Badge>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Active Balances:</span>
