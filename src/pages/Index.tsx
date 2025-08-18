@@ -7,10 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Shield, AlertTriangle, TrendingUp, Radio, Wallet } from "lucide-react";
+import { Loader2, Shield, AlertTriangle, TrendingUp, Radio, Wallet, History } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import RealTimeMonitor from "@/components/RealTimeMonitor";
 import BalanceTracker from "@/components/balance-tracker/BalanceTracker";
+import HistoryCheck from "@/components/HistoryCheck";
 
 interface Transfer {
   tokenSymbol: string;
@@ -173,7 +174,7 @@ const Index = () => {
           </header>
 
           <Tabs defaultValue="transfers" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="transfers" className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
                 Stablecoin Transfers
@@ -189,6 +190,10 @@ const Index = () => {
               <TabsTrigger value="balances" className="flex items-center gap-2">
                 <Wallet className="w-4 h-4" />
                 Balance Tracker
+              </TabsTrigger>
+              <TabsTrigger value="history" className="flex items-center gap-2">
+                <History className="w-4 h-4" />
+                History Check
               </TabsTrigger>
             </TabsList>
 
@@ -500,6 +505,10 @@ const Index = () => {
 
             <TabsContent value="balances" className="space-y-6">
               <BalanceTracker />
+            </TabsContent>
+
+            <TabsContent value="history" className="space-y-6">
+              <HistoryCheck />
             </TabsContent>
           </Tabs>
         </div>
