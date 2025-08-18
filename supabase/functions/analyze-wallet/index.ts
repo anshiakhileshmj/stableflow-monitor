@@ -57,56 +57,95 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!etherscanApiKey || !supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing required environment variables');
+    if (!etherscanApiKey) {
+      console.error('Missing ETHERSCAN_API_KEY environment variable');
+      throw new Error('API configuration error - missing API key');
+    }
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing Supabase environment variables');
+      throw new Error('Database configuration error');
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     console.log(`Analyzing wallet: ${walletAddress} on ${network}`);
 
-    // Use network-specific API endpoints
+    // Add delay to avoid rate limiting
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // Use network-specific API endpoints with rate limiting protection
     const etherscanUrl = `${networkConfig.apiEndpoint}?module=account&action=txlist&address=${walletAddress}&startblock=0&endblock=99999999&page=1&offset=100&sort=desc&apikey=${etherscanApiKey}`;
     const balanceUrl = `${networkConfig.apiEndpoint}?module=account&action=balance&address=${walletAddress}&tag=latest&apikey=${etherscanApiKey}`;
-    const internalTxUrl = `${networkConfig.apiEndpoint}?module=account&action=txlistinternal&address=${walletAddress}&startblock=0&endblock=99999999&page=1&offset=50&sort=desc&apikey=${etherscanApiKey}`;
-    const tokenTransfersUrl = `${networkConfig.apiEndpoint}?module=account&action=tokentx&address=${walletAddress}&startblock=0&endblock=99999999&page=1&offset=50&sort=desc&apikey=${etherscanApiKey}`;
 
-    const [etherscanResponse, balanceResponse, internalTxResponse, tokenTransfersResponse] = await Promise.all([
-      fetch(etherscanUrl),
-      fetch(balanceUrl),
-      fetch(internalTxUrl),
-      fetch(tokenTransfersUrl)
+    console.log(`Fetching transactions from: ${etherscanUrl}`);
+    console.log(`Fetching balance from: ${balanceUrl}`);
+
+    // Fetch with retry logic
+    const fetchWithRetry = async (url: string, maxRetries = 3) => {
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          console.log(`Attempt ${i + 1} for URL: ${url}`);
+          const response = await fetch(url);
+          
+          if (!response.ok) {
+            console.error(`HTTP ${response.status}: ${response.statusText}`);
+            if (i === maxRetries - 1) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            await delay(1000 * (i + 1)); // Exponential backoff
+            continue;
+          }
+          
+          const data = await response.json();
+          console.log(`API Response status: ${data.status}, message: ${data.message}`);
+          
+          if (data.status === '0' && data.message === 'No transactions found') {
+            // This is a valid response for wallets with no transactions
+            return { status: '1', result: [] };
+          }
+          
+          if (data.status !== '1') {
+            console.error(`API Error: ${data.message} (status: ${data.status})`);
+            if (data.message?.includes('rate limit') && i < maxRetries - 1) {
+              await delay(2000 * (i + 1)); // Longer delay for rate limits
+              continue;
+            }
+            throw new Error(`${network} API error: ${data.message || 'Unknown error'}`);
+          }
+          
+          return data;
+        } catch (error) {
+          console.error(`Fetch attempt ${i + 1} failed:`, error);
+          if (i === maxRetries - 1) throw error;
+          await delay(1000 * (i + 1));
+        }
+      }
+    };
+
+    // Fetch data with delays between requests
+    const [etherscanData, balanceData] = await Promise.all([
+      fetchWithRetry(etherscanUrl),
+      (async () => {
+        await delay(200); // Small delay between requests
+        return fetchWithRetry(balanceUrl);
+      })()
     ]);
 
-    const [etherscanData, balanceData, internalTxData, tokenTransfersData] = await Promise.all([
-      etherscanResponse.json(),
-      balanceResponse.json(),
-      internalTxResponse.json(),
-      tokenTransfersResponse.json()
-    ]);
-
-    if (etherscanData.status !== '1') {
-      throw new Error(`${network} API error: ${etherscanData.message}`);
-    }
-
-    const transactions = etherscanData.result;
+    const transactions = etherscanData.result || [];
     const balance = balanceData.status === '1' ? (parseFloat(balanceData.result) / 1e18).toFixed(6) : '0';
-    const internalTransactions = internalTxData.status === '1' ? internalTxData.result : [];
-    const tokenTransfers = tokenTransfersData.status === '1' ? tokenTransfersData.result : [];
 
-    console.log(`Found ${transactions.length} transactions, ${internalTransactions.length} internal txs, ${tokenTransfers.length} token transfers on ${network}`);
+    console.log(`Found ${transactions.length} transactions on ${network}`);
 
     // Process and format transactions
     const processedTransactions = transactions.map((tx: any) => ({
       hash: tx.hash,
       timestamp: new Date(parseInt(tx.timeStamp) * 1000),
-      value: (parseFloat(tx.value) / 1e18).toFixed(6), // Convert wei to native token
+      value: (parseFloat(tx.value) / 1e18).toFixed(6),
       from: tx.from,
       to: tx.to,
       isError: tx.isError === '1'
     }));
 
-    // Calculate wallet risk metrics (same logic for all EVM chains)
+    // Calculate wallet risk metrics
     const totalTxs = transactions.length;
     const failedTxs = transactions.filter((tx: any) => tx.isError === '1').length;
     const failedRatio = totalTxs > 0 ? (failedTxs / totalTxs) : 0;
@@ -187,8 +226,8 @@ serve(async (req) => {
       network,
       transactions: processedTransactions,
       balance: balance,
-      internalTransactions: internalTransactions.slice(0, 20),
-      tokenTransfers: tokenTransfers.slice(0, 20),
+      internalTransactions: [], // Simplified for now
+      tokenTransfers: [], // Simplified for now
       riskAnalysis: {
         totalTransactions: totalTxs,
         failedTransactions: failedTxs,
@@ -204,7 +243,8 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in analyze-wallet function:', error);
     return new Response(JSON.stringify({ 
-      error: error.message 
+      error: error.message || 'An unknown error occurred',
+      details: 'Please check if the wallet address is valid and try again. If the problem persists, the API may be experiencing rate limits.'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -288,7 +328,8 @@ async function handleXRPAnalysis(walletAddress: string) {
   } catch (error) {
     console.error('Error analyzing XRP wallet:', error);
     return new Response(JSON.stringify({ 
-      error: 'Failed to analyze XRP wallet' 
+      error: 'Failed to analyze XRP wallet',
+      details: error.message
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
