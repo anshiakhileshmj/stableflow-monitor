@@ -4,14 +4,34 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { Copy, Book, Code, Zap, Shield, Globe } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface ApiParameter {
+  type: string;
+  required: boolean;
+  description: string;
+  default?: string | number;
+}
+
+interface ApiEndpoint {
+  id: string;
+  name: string;
+  method: string;
+  path: string;
+  category: string;
+  description: string;
+  parameters: Record<string, ApiParameter>;
+  example: {
+    request: string;
+    response: string;
+  };
+}
 
 const Docs = () => {
   const [selectedEndpoint, setSelectedEndpoint] = useState('analyze-wallet');
 
-  const apiEndpoints = [
+  const apiEndpoints: ApiEndpoint[] = [
     {
       id: 'analyze-wallet',
       name: 'Analyze Wallet',
@@ -339,7 +359,7 @@ const Docs = () => {
                               <span className="text-xs text-muted-foreground">{param.type}</span>
                             </div>
                             <p className="text-sm text-muted-foreground">{param.description}</p>
-                            {param.default && (
+                            {param.default !== undefined && (
                               <p className="text-xs text-muted-foreground mt-1">Default: {param.default}</p>
                             )}
                           </div>
