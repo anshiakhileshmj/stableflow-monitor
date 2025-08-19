@@ -1,55 +1,34 @@
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/useAuth";
-import { LogOut, User } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { Code, FileText, Settings } from 'lucide-react';
 
 const AppHeader = () => {
-  const { user, signOut } = useAuth();
-  const { toast } = useToast();
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      toast({
-        title: "Signed Out",
-        description: "You have been successfully signed out.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to sign out. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  if (!user) return null;
-
   return (
-    <div className="bg-card border-b">
-      <div className="max-w-7xl mx-auto px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold">AML Tracker Dashboard</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <User className="w-4 h-4" />
-              <span>{user.email}</span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSignOut}
-              className="flex items-center gap-2"
-            >
-              <LogOut className="w-4 h-4" />
-              Sign Out
-            </Button>
-          </div>
+    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <h1 className="text-xl font-bold">Wallet Monitor</h1>
         </div>
+        
+        <nav className="flex items-center space-x-2">
+          <Button variant="ghost" size="sm" asChild>
+            <a href="/docs" className="flex items-center space-x-1">
+              <FileText className="w-4 h-4" />
+              <span>API Docs</span>
+            </a>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <a href="/dashboard" className="flex items-center space-x-1">
+              <Settings className="w-4 h-4" />
+              <span>Dashboard</span>
+            </a>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <a href="/auth">Sign In</a>
+          </Button>
+        </nav>
       </div>
-    </div>
+    </header>
   );
 };
 
