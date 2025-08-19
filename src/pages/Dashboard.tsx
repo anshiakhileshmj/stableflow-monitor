@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,17 +10,7 @@ import { Copy, Plus, Eye, EyeOff, Trash2, Key, BarChart3, Settings, Code } from 
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-
-interface ApiKey {
-  id: string;
-  name: string;
-  key_hash: string;
-  created_at: string;
-  last_used_at: string | null;
-  expires_at: string | null;
-  is_active: boolean;
-  rate_limit_per_minute: number;
-}
+import { useApiKeys } from '@/hooks/useApiKeys';
 
 interface ApiUsage {
   endpoint: string;
@@ -32,37 +21,18 @@ interface ApiUsage {
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const { apiKeys, loading, createApiKey, deleteApiKey, toggleApiKey } = useApiKeys();
   const [usage, setUsage] = useState<ApiUsage[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyVisible, setNewKeyVisible] = useState('');
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
-      fetchApiKeys();
       fetchUsage();
     }
   }, [user]);
-
-  const fetchApiKeys = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('api_keys')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setApiKeys(data || []);
-    } catch (error) {
-      console.error('Error fetching API keys:', error);
-      toast.error('Failed to load API keys');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchUsage = async () => {
     try {
@@ -79,62 +49,21 @@ const Dashboard = () => {
     }
   };
 
-  const createApiKey = async () => {
+  const handleCreateApiKey = async () => {
     if (!newKeyName.trim()) {
       toast.error('Please enter a key name');
       return;
     }
 
-    try {
-      // Generate new API key
-      const { data: keyData, error: keyError } = await supabase.rpc('generate_api_key');
-      if (keyError) throw keyError;
-
-      const newKey = keyData as string;
-      
-      // Hash the key for storage
-      const encoder = new TextEncoder();
-      const keyBytes = encoder.encode(newKey);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', keyBytes);
-      const hashArray = new Uint8Array(hashBuffer);
-      const keyHash = Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
-
-      // Store the key in database
-      const { error: insertError } = await supabase
-        .from('api_keys')
-        .insert({
-          name: newKeyName.trim(),
-          key_hash: keyHash,
-          user_id: user?.id
-        });
-
-      if (insertError) throw insertError;
-
+    const newKey = await createApiKey(newKeyName.trim());
+    if (newKey) {
       setNewKeyVisible(newKey);
       setNewKeyName('');
-      fetchApiKeys();
-      toast.success('API key created successfully');
-    } catch (error) {
-      console.error('Error creating API key:', error);
-      toast.error('Failed to create API key');
     }
   };
 
-  const deleteApiKey = async (keyId: string) => {
-    try {
-      const { error } = await supabase
-        .from('api_keys')
-        .delete()
-        .eq('id', keyId);
-
-      if (error) throw error;
-      
-      fetchApiKeys();
-      toast.success('API key deleted');
-    } catch (error) {
-      console.error('Error deleting API key:', error);
-      toast.error('Failed to delete API key');
-    }
+  const handleDeleteApiKey = async (keyId: string) => {
+    await deleteApiKey(keyId);
   };
 
   const toggleKeyVisibility = (keyId: string) => {
@@ -248,7 +177,7 @@ const Dashboard = () => {
                       </div>
                     )}
                     <div className="flex space-x-2">
-                      <Button onClick={createApiKey} disabled={!newKeyName.trim()}>
+                      <Button onClick={handleCreateApiKey} disabled={!newKeyName.trim()}>
                         Create Key
                       </Button>
                       {newKeyVisible && (
@@ -329,7 +258,7 @@ const Dashboard = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => deleteApiKey(key.id)}
+                          onClick={() => handleDeleteApiKey(key.id)}
                           className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="w-4 h-4" />
