@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,11 +6,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
-import StablecoinTransfers from "./pages/StablecoinTransfers";
-import WalletAnalysis from "./pages/WalletAnalysis";
-import Monitor from "./pages/Monitor";
-import Balances from "./pages/Balances";
-import HistoryPage from "./pages/HistoryPage";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -31,31 +25,7 @@ const App = () => (
                 <Index />
               </ProtectedRoute>
             } />
-            <Route path="/stablecoin-transfers" element={
-              <ProtectedRoute>
-                <StablecoinTransfers />
-              </ProtectedRoute>
-            } />
-            <Route path="/wallet-analysis" element={
-              <ProtectedRoute>
-                <WalletAnalysis />
-              </ProtectedRoute>
-            } />
-            <Route path="/monitor" element={
-              <ProtectedRoute>
-                <Monitor />
-              </ProtectedRoute>
-            } />
-            <Route path="/balances" element={
-              <ProtectedRoute>
-                <Balances />
-              </ProtectedRoute>
-            } />
-            <Route path="/history" element={
-              <ProtectedRoute>
-                <HistoryPage />
-              </ProtectedRoute>
-            } />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
