@@ -4,13 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Copy, Plus, Eye, EyeOff, Trash2, Key, BarChart3, Settings, Code } from 'lucide-react';
+import { Copy, BarChart3, Settings, Code } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useApiKeys } from '@/hooks/useApiKeys';
+import ApiKeysManager from '@/components/ApiKeysManager';
 
 interface ApiUsage {
   endpoint: string;
@@ -21,12 +20,7 @@ interface ApiUsage {
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { apiKeys, loading, createApiKey, deleteApiKey, toggleApiKey } = useApiKeys();
   const [usage, setUsage] = useState<ApiUsage[]>([]);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newKeyName, setNewKeyName] = useState('');
-  const [newKeyVisible, setNewKeyVisible] = useState('');
-  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user) {
@@ -47,33 +41,6 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error fetching usage:', error);
     }
-  };
-
-  const handleCreateApiKey = async () => {
-    if (!newKeyName.trim()) {
-      toast.error('Please enter a key name');
-      return;
-    }
-
-    const newKey = await createApiKey(newKeyName.trim());
-    if (newKey) {
-      setNewKeyVisible(newKey);
-      setNewKeyName('');
-    }
-  };
-
-  const handleDeleteApiKey = async (keyId: string) => {
-    await deleteApiKey(keyId);
-  };
-
-  const toggleKeyVisibility = (keyId: string) => {
-    const newVisibleKeys = new Set(visibleKeys);
-    if (newVisibleKeys.has(keyId)) {
-      newVisibleKeys.delete(keyId);
-    } else {
-      newVisibleKeys.add(keyId);
-    }
-    setVisibleKeys(newVisibleKeys);
   };
 
   const copyToClipboard = (text: string) => {
@@ -129,146 +96,7 @@ const Dashboard = () => {
 
           {/* API Keys Tab */}
           <TabsContent value="keys" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold">API Keys</h2>
-                <p className="text-muted-foreground">Create and manage your API keys</p>
-              </div>
-              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="flex items-center space-x-2">
-                    <Plus className="w-4 h-4" />
-                    <span>Create API Key</span>
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create New API Key</DialogTitle>
-                    <DialogDescription>
-                      Give your API key a descriptive name to help you identify it later.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="keyName">Key Name</Label>
-                      <Input
-                        id="keyName"
-                        placeholder="e.g., Production App, Development"
-                        value={newKeyName}
-                        onChange={(e) => setNewKeyName(e.target.value)}
-                      />
-                    </div>
-                    {newKeyVisible && (
-                      <div className="space-y-2">
-                        <Label>Your New API Key (Save this now!)</Label>
-                        <div className="flex items-center space-x-2">
-                          <Input value={newKeyVisible} readOnly className="font-mono text-sm" />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => copyToClipboard(newKeyVisible)}
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                        </div>
-                        <p className="text-sm text-destructive">
-                          This key will only be shown once. Make sure to copy it now!
-                        </p>
-                      </div>
-                    )}
-                    <div className="flex space-x-2">
-                      <Button onClick={handleCreateApiKey} disabled={!newKeyName.trim()}>
-                        Create Key
-                      </Button>
-                      {newKeyVisible && (
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setIsCreateDialogOpen(false);
-                            setNewKeyVisible('');
-                            setNewKeyName('');
-                          }}
-                        >
-                          Done
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <div className="grid gap-4">
-              {loading ? (
-                <div className="text-center py-8">Loading...</div>
-              ) : apiKeys.length === 0 ? (
-                <Card>
-                  <CardContent className="py-8 text-center">
-                    <Key className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="font-semibold mb-2">No API keys yet</h3>
-                    <p className="text-muted-foreground mb-4">Create your first API key to get started</p>
-                    <Button onClick={() => setIsCreateDialogOpen(true)}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create API Key
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                apiKeys.map((key) => (
-                  <Card key={key.id}>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <h3 className="font-semibold">{key.name}</h3>
-                            <Badge variant={key.is_active ? 'default' : 'secondary'}>
-                              {key.is_active ? 'Active' : 'Inactive'}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center space-x-2 mb-2">
-                            <code className="text-sm bg-muted px-2 py-1 rounded font-mono">
-                              {visibleKeys.has(key.id) 
-                                ? `${key.key_hash.substring(0, 8)}...` 
-                                : '••••••••••••••••'
-                              }
-                            </code>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => toggleKeyVisibility(key.id)}
-                            >
-                              {visibleKeys.has(key.id) ? (
-                                <EyeOff className="w-4 h-4" />
-                              ) : (
-                                <Eye className="w-4 h-4" />
-                              )}
-                            </Button>
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            <div>Created: {new Date(key.created_at).toLocaleDateString()}</div>
-                            <div>
-                              Last used: {key.last_used_at 
-                                ? new Date(key.last_used_at).toLocaleDateString() 
-                                : 'Never'
-                              }
-                            </div>
-                            <div>Rate limit: {key.rate_limit_per_minute} requests/minute</div>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteApiKey(key.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
+            <ApiKeysManager />
           </TabsContent>
 
           {/* Usage Analytics Tab */}
