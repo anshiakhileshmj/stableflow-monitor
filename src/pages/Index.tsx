@@ -6,11 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Shield, Database, Key, Activity, FileText, ExternalLink, BarChart3, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
-import { RealTimeMonitor } from "@/components/RealTimeMonitor";
-import { BalanceTracker } from "@/components/balance-tracker/BalanceTracker";
-import { StablecoinTransfersTab } from "@/components/StablecoinTransfersTab";
-import { HistoryCheck } from "@/components/HistoryCheck";
-import { AddressDisplay } from "@/components/AddressDisplay";
+import RealTimeMonitor from "@/components/RealTimeMonitor";
+import BalanceTracker from "@/components/balance-tracker/BalanceTracker";
+import StablecoinTransfersTab from "@/components/StablecoinTransfersTab";
+import HistoryCheck from "@/components/HistoryCheck";
+import AddressDisplay from "@/components/AddressDisplay";
 
 export default function Index() {
   const [activeTab, setActiveTab] = useState("overview");
