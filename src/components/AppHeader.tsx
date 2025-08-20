@@ -1,7 +1,9 @@
+
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { LogOut, User } from "lucide-react";
+import { LogOut, User, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
 
 const AppHeader = () => {
   const { user, signOut } = useAuth();
@@ -30,9 +32,17 @@ const AppHeader = () => {
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold">AML Tracker Dashboard</h1>
+            <Link to="/" className="text-xl font-semibold hover:text-primary transition-colors">
+              AML Tracker Dashboard
+            </Link>
           </div>
           <div className="flex items-center gap-4">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/api-management" className="flex items-center gap-2">
+                <Key className="w-4 h-4" />
+                API Management
+              </Link>
+            </Button>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <User className="w-4 h-4" />
               <span>{user.email}</span>

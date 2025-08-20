@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import RelayCompliance from "./pages/RelayCompliance";
+import ApiManagement from "./pages/ApiManagement";
 import AppHeader from "./components/AppHeader";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,14 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <RelayCompliance />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/api-management"
+                  element={
+                    <ProtectedRoute>
+                      <ApiManagement />
                     </ProtectedRoute>
                   }
                 />
