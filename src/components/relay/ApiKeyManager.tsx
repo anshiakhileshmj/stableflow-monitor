@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,12 +13,16 @@ import { toast } from "sonner";
 interface ApiKey {
   id: string;
   name: string;
-  key: string;
+  key_hash: string;
   partner_id: string;
-  active: boolean;
+  is_active: boolean;
   rate_limit_per_minute: number;
   created_at: string;
   last_used_at: string | null;
+  expires_at: string | null;
+  user_id: string;
+  // We'll store the actual key temporarily for display after generation
+  key?: string;
 }
 
 export function ApiKeyManager() {
@@ -71,10 +74,9 @@ export function ApiKeyManager() {
         .insert({
           user_id: user?.id,
           name: newKeyName,
-          key: newKey,
           key_hash: keyHash,
           partner_id: newPartnerId,
-          active: true,
+          is_active: true,
           rate_limit_per_minute: 100
         });
 
@@ -83,7 +85,19 @@ export function ApiKeyManager() {
       toast.success("API key generated successfully");
       setNewKeyName("");
       setNewPartnerId("");
-      fetchApiKeys();
+      
+      // Fetch updated keys and temporarily store the new key for display
+      await fetchApiKeys();
+      
+      // Add the actual key to the first item (newest) for display purposes
+      setApiKeys(prevKeys => {
+        if (prevKeys.length > 0) {
+          const updatedKeys = [...prevKeys];
+          updatedKeys[0] = { ...updatedKeys[0], key: newKey };
+          return updatedKeys;
+        }
+        return prevKeys;
+      });
     } catch (error) {
       console.error("Error generating API key:", error);
       toast.error("Failed to generate API key");
@@ -116,7 +130,7 @@ export function ApiKeyManager() {
     try {
       const { error } = await supabase
         .from("api_keys")
-        .update({ active: !currentStatus })
+        .update({ is_active: !currentStatus })
         .eq("id", keyId);
 
       if (error) throw error;
@@ -153,6 +167,15 @@ export function ApiKeyManager() {
   const maskKey = (key: string) => {
     if (key.length <= 8) return key;
     return key.substring(0, 8) + "..." + key.substring(key.length - 4);
+  };
+
+  const getDisplayKey = (apiKey: ApiKey) => {
+    // If we have the actual key (just generated), show it
+    if (apiKey.key) {
+      return apiKey.key;
+    }
+    // Otherwise, show a masked version of the hash
+    return maskKey(apiKey.key_hash);
   };
 
   if (!user) {
@@ -236,7 +259,7 @@ export function ApiKeyManager() {
                     <TableCell className="font-mono text-sm">
                       <div className="flex items-center gap-2">
                         <span>
-                          {showKeys[apiKey.id] ? apiKey.key : maskKey(apiKey.key)}
+                          {showKeys[apiKey.id] ? getDisplayKey(apiKey) : maskKey(getDisplayKey(apiKey))}
                         </span>
                         <Button
                           variant="ghost"
@@ -248,7 +271,7 @@ export function ApiKeyManager() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => copyToClipboard(apiKey.key)}
+                          onClick={() => copyToClipboard(getDisplayKey(apiKey))}
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -256,8 +279,8 @@ export function ApiKeyManager() {
                     </TableCell>
                     <TableCell>{apiKey.partner_id}</TableCell>
                     <TableCell>
-                      <Badge variant={apiKey.active ? "default" : "secondary"}>
-                        {apiKey.active ? "Active" : "Inactive"}
+                      <Badge variant={apiKey.is_active ? "default" : "secondary"}>
+                        {apiKey.is_active ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell>{apiKey.rate_limit_per_minute}/min</TableCell>
@@ -272,7 +295,7 @@ export function ApiKeyManager() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => toggleKeyStatus(apiKey.id, apiKey.active)}
+                          onClick={() => toggleKeyStatus(apiKey.id, apiKey.is_active)}
                         >
                           <RotateCcw className="h-4 w-4" />
                         </Button>
