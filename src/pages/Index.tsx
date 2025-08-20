@@ -1,244 +1,440 @@
 
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Database, Key, Activity, FileText, ExternalLink, BarChart3, Wallet } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Shield, AlertTriangle, TrendingUp, Radio, Wallet, History } from "lucide-react";
+import AppHeader from "@/components/AppHeader";
 import RealTimeMonitor from "@/components/RealTimeMonitor";
-import BalanceTracker from "@/components/balance-tracker/BalanceTracker";
 import StablecoinTransfersTab from "@/components/StablecoinTransfersTab";
+import BalanceTracker from "@/components/balance-tracker/BalanceTracker";
 import HistoryCheck from "@/components/HistoryCheck";
 import AddressDisplay from "@/components/AddressDisplay";
+import NetworkSelector from "@/components/NetworkSelector";
+import { SUPPORTED_NETWORKS } from '@/lib/networks';
 
-export default function Index() {
-  const [activeTab, setActiveTab] = useState("overview");
+interface Transaction {
+  hash: string;
+  timestamp: Date;
+  value: string;
+  from: string;
+  to: string;
+  isError: boolean;
+}
+
+interface TokenTransfer {
+  hash: string;
+  tokenName: string;
+  tokenSymbol: string;
+  value: string;
+  from: string;
+  to: string;
+  timeStamp: string;
+}
+
+interface InternalTransaction {
+  hash: string;
+  value: string;
+  from: string;
+  to: string;
+  timeStamp: string;
+  isError: string;
+}
+
+interface RiskAnalysis {
+  totalTransactions: number;
+  failedTransactions: number;
+  failedTransactionRatio: number;
+  walletAgeDays: number;
+  riskScore: number;
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+const Index = () => {
+  const [network, setNetwork] = useState("ethereum");
+  const [walletAddress, setWalletAddress] = useState("");
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [tokenTransfers, setTokenTransfers] = useState<TokenTransfer[]>([]);
+  const [internalTransactions, setInternalTransactions] = useState<InternalTransaction[]>([]);
+  const [walletBalance, setWalletBalance] = useState<string>("");
+  const [riskAnalysis, setRiskAnalysis] = useState<RiskAnalysis | null>(null);
+  const [isAnalyzingWallet, setIsAnalyzingWallet] = useState(false);
+  const { toast } = useToast();
+
+  const analyzeWallet = async () => {
+    if (!walletAddress.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a wallet address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAnalyzingWallet(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-wallet', {
+        body: { walletAddress: walletAddress.trim(), network }
+      });
+      
+      if (error) throw error;
+      
+      setTransactions(data.transactions || []);
+      setTokenTransfers(data.tokenTransfers || []);
+      setInternalTransactions(data.internalTransactions || []);
+      setWalletBalance(data.balance || "0");
+      setRiskAnalysis(data.riskAnalysis);
+      toast({
+        title: "Analysis Complete",
+        description: `Analyzed ${data.transactions?.length || 0} transactions, ${data.tokenTransfers?.length || 0} token transfers on ${SUPPORTED_NETWORKS[network]?.name || network}`,
+      });
+    } catch (error) {
+      console.error('Error analyzing wallet:', error);
+      toast({
+        title: "Error",
+        description: `Failed to analyze wallet on ${SUPPORTED_NETWORKS[network]?.name || network}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzingWallet(false);
+    }
+  };
+
+  const getRiskBadgeVariant = (level: string) => {
+    switch (level) {
+      case 'LOW': return 'default';
+      case 'MEDIUM': return 'secondary';
+      case 'HIGH': return 'destructive';
+      default: return 'outline';
+    }
+  };
+
+  const formatTimestamp = (timestamp: string | Date) => {
+    return new Date(timestamp).toLocaleString();
+  };
+
+  const getNativeSymbol = () => {
+    return SUPPORTED_NETWORKS[network]?.nativeCurrency.symbol || 'TOKEN';
+  };
 
   return (
-    <div className="container mx-auto p-6">
-      {/* Hero Section */}
-      <div className="text-center space-y-4 mb-8">
-        <h1 className="text-4xl font-bold tracking-tight">WalletMate</h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-          Comprehensive blockchain analytics and AML compliance platform for Web3 developers and businesses
-        </p>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Relay API</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">Live</div>
-            <p className="text-xs text-muted-foreground">
-              AML compliance service
+    <div className="min-h-screen bg-background">
+      <AppHeader />
+      <div className="p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <header className="text-center space-y-2">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              Stablecoin AML Tracker
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Track stablecoin transfers and analyze wallet risk in real-time across multiple blockchains
             </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Supported Chains</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">10+</div>
-            <p className="text-xs text-muted-foreground">
-              Major blockchain networks
-            </p>
-          </CardContent>
-        </Card>
+          </header>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">API Endpoints</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">2</div>
-            <p className="text-xs text-muted-foreground">
-              /v1/check & /v1/relay
-            </p>
-          </CardContent>
-        </Card>
+          <Tabs defaultValue="transfers" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="transfers" className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Stablecoin Transfers
+              </TabsTrigger>
+              <TabsTrigger value="wallet" className="flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                Wallet Analysis
+              </TabsTrigger>
+              <TabsTrigger value="monitor" className="flex items-center gap-2">
+                <Radio className="w-4 h-4" />
+                Real-Time Monitor
+              </TabsTrigger>
+              <TabsTrigger value="balances" className="flex items-center gap-2">
+                <Wallet className="w-4 h-4" />
+                Balance Tracker
+              </TabsTrigger>
+              <TabsTrigger value="history" className="flex items-center gap-2">
+                <History className="w-4 h-4" />
+                History Check
+              </TabsTrigger>
+            </TabsList>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Real-time</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">24/7</div>
-            <p className="text-xs text-muted-foreground">
-              Monitoring & analytics
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+            <TabsContent value="transfers" className="space-y-6">
+              <StablecoinTransfersTab />
+            </TabsContent>
 
-      {/* Main Content Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="real-time">Real-time Monitor</TabsTrigger>
-          <TabsTrigger value="balance">Balance Tracker</TabsTrigger>
-          <TabsTrigger value="stablecoin">Stablecoin Transfers</TabsTrigger>
-          <TabsTrigger value="history">History Check</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          {/* Platform Features */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card className="relative overflow-hidden">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <Shield className="h-8 w-8 text-blue-600" />
-                  <Badge variant="default">Live</Badge>
-                </div>
-                <CardTitle>Relay Compliance API</CardTitle>
-                <CardDescription>
-                  B2B AML compliance service for developers to integrate real-time sanctions screening into their apps
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">✓ /v1/check - Pre-flight risk assessment</p>
-                  <p className="text-sm text-muted-foreground">✓ /v1/relay - Transaction relay with enforcement</p>
-                  <p className="text-sm text-muted-foreground">✓ OFAC sanctions screening</p>
-                  <p className="text-sm text-muted-foreground">✓ Multi-chain support</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button asChild size="sm">
-                    <Link to="/api-management">API Management</Link>
-                  </Button>
-                  <Button asChild variant="outline" size="sm">
-                    <a href="https://resumeak.onrender.com/docs" target="_blank" rel="noopener noreferrer">
-                      API Docs <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <Wallet className="h-8 w-8 text-green-600" />
-                  <Badge variant="secondary">Available</Badge>
-                </div>
-                <CardTitle>Wallet Analytics</CardTitle>
-                <CardDescription>
-                  Comprehensive wallet tracking, balance monitoring, and transaction history analysis
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">✓ Real-time balance tracking</p>
-                  <p className="text-sm text-muted-foreground">✓ Transaction history</p>
-                  <p className="text-sm text-muted-foreground">✓ Multi-asset support</p>
-                  <p className="text-sm text-muted-foreground">✓ Portfolio analytics</p>
-                </div>
-                <Button size="sm" className="w-full" onClick={() => setActiveTab("balance")}>
-                  View Analytics
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <Activity className="h-8 w-8 text-purple-600" />
-                  <Badge variant="outline">Live</Badge>
-                </div>
-                <CardTitle>Real-time Monitoring</CardTitle>
-                <CardDescription>
-                  Live transaction monitoring with whale alerts and large transfer detection
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">✓ Live transaction feed</p>
-                  <p className="text-sm text-muted-foreground">✓ Whale movement alerts</p>
-                  <p className="text-sm text-muted-foreground">✓ Large transfer detection</p>
-                  <p className="text-sm text-muted-foreground">✓ Multi-chain coverage</p>
-                </div>
-                <Button size="sm" className="w-full" onClick={() => setActiveTab("real-time")}>
-                  View Monitor
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* API Endpoints Overview */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-6 w-6" />
-                Relay API Endpoints
-              </CardTitle>
-              <CardDescription>
-                Your B2B AML compliance API endpoints deployed on Render
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <h4 className="font-semibold text-lg">Production Endpoints</h4>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <code className="text-sm font-mono">POST /v1/check</code>
-                        <p className="text-xs text-muted-foreground">Pre-flight risk assessment</p>
-                      </div>
-                      <Badge variant="outline">Live</Badge>
+            <TabsContent value="wallet" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Wallet Risk Analysis</CardTitle>
+                  <CardDescription>
+                    Analyze wallets for AML compliance and risk factors across multiple blockchains
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Wallet Address</label>
+                      <Input
+                        placeholder="Enter wallet address (0x... or XRP address)"
+                        value={walletAddress}
+                        onChange={(e) => setWalletAddress(e.target.value)}
+                        className="font-mono"
+                      />
                     </div>
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <code className="text-sm font-mono">POST /v1/relay</code>
-                        <p className="text-xs text-muted-foreground">Transaction relay with enforcement</p>
-                      </div>
-                      <Badge variant="outline">Live</Badge>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Network</label>
+                      <NetworkSelector
+                        value={network}
+                        onValueChange={setNetwork}
+                      />
                     </div>
                   </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <h4 className="font-semibold text-lg">Integration Flow</h4>
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <p>1. Developers integrate your API into their apps</p>
-                    <p>2. End users input wallet addresses for payments</p>
-                    <p>3. Your API checks sanctions & risk in real-time</p>
-                    <p>4. Payment processed if risk = 0, blocked if risky</p>
+
+                  <Button 
+                    onClick={analyzeWallet}
+                    disabled={isAnalyzingWallet}
+                    className="w-full"
+                  >
+                    {isAnalyzingWallet ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Analyzing on {SUPPORTED_NETWORKS[network]?.name}...
+                      </>
+                    ) : (
+                      <>
+                        <Shield className="w-4 h-4 mr-2" />
+                        Analyze Wallet
+                      </>
+                    )}
+                  </Button>
+
+                  {riskAnalysis && (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2">
+                            <Shield className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">Risk Level</span>
+                          </div>
+                          <Badge 
+                            variant={getRiskBadgeVariant(riskAnalysis.riskLevel)}
+                            className="mt-2"
+                          >
+                            {riskAnalysis.riskLevel} ({riskAnalysis.riskScore}/10)
+                          </Badge>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="text-sm text-muted-foreground">{getNativeSymbol()} Balance</div>
+                          <div className="text-2xl font-bold">
+                            {parseFloat(walletBalance).toFixed(4)} {getNativeSymbol()}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{SUPPORTED_NETWORKS[network]?.name}</div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="text-sm text-muted-foreground">Wallet Age</div>
+                          <div className="text-2xl font-bold">
+                            {riskAnalysis.walletAgeDays} days
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="text-sm text-muted-foreground">Total Transactions</div>
+                          <div className="text-2xl font-bold">
+                            {riskAnalysis.totalTransactions.toLocaleString()}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="text-sm text-muted-foreground">Failed TX Ratio</div>
+                          <div className="text-2xl font-bold">
+                            {(riskAnalysis.failedTransactionRatio * 100).toFixed(1)}%
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+
+                  <div className="space-y-6">
+                    {transactions.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Recent Transactions (Last 100) - {SUPPORTED_NETWORKS[network]?.name}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="max-h-96 overflow-y-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Hash</TableHead>
+                                  <TableHead>Value ({getNativeSymbol()})</TableHead>
+                                  <TableHead>From</TableHead>
+                                  <TableHead>To</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>Timestamp</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {transactions.map((tx) => (
+                                  <TableRow key={tx.hash}>
+                                    <TableCell>
+                                      <AddressDisplay address={tx.hash} />
+                                    </TableCell>
+                                    <TableCell className="font-mono">
+                                      {parseFloat(tx.value).toFixed(6)}
+                                    </TableCell>
+                                    <TableCell>
+                                      <AddressDisplay address={tx.from} />
+                                    </TableCell>
+                                    <TableCell>
+                                      <AddressDisplay address={tx.to} />
+                                    </TableCell>
+                                    <TableCell>
+                                      {tx.isError ? (
+                                        <Badge variant="destructive">
+                                          <AlertTriangle className="w-3 h-3 mr-1" />
+                                          Failed
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="default">Success</Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      {formatTimestamp(tx.timestamp)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {tokenTransfers.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Token Transfers - {SUPPORTED_NETWORKS[network]?.name}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Token</TableHead>
+                                <TableHead>Amount</TableHead>
+                                <TableHead>From</TableHead>
+                                <TableHead>To</TableHead>
+                                <TableHead>Timestamp</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {tokenTransfers.map((transfer, index) => (
+                                <TableRow key={`${transfer.hash}-${index}`}>
+                                  <TableCell>
+                                    <Badge variant="outline">
+                                      {transfer.tokenSymbol || 'Unknown'}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="font-mono">
+                                    {parseFloat(transfer.value).toLocaleString()}
+                                  </TableCell>
+                                  <TableCell>
+                                    <AddressDisplay address={transfer.from} />
+                                  </TableCell>
+                                  <TableCell>
+                                    <AddressDisplay address={transfer.to} />
+                                  </TableCell>
+                                  <TableCell>
+                                    {formatTimestamp(transfer.timeStamp)}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {internalTransactions.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Internal Transactions - {SUPPORTED_NETWORKS[network]?.name}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Hash</TableHead>
+                                <TableHead>Value ({getNativeSymbol()})</TableHead>
+                                <TableHead>From</TableHead>
+                                <TableHead>To</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {internalTransactions.map((tx, index) => (
+                                <TableRow key={`${tx.hash}-${index}`}>
+                                  <TableCell>
+                                    <AddressDisplay address={tx.hash} />
+                                  </TableCell>
+                                  <TableCell className="font-mono">
+                                    {(parseFloat(tx.value) / 1e18).toFixed(6)}
+                                  </TableCell>
+                                  <TableCell>
+                                    <AddressDisplay address={tx.from} />
+                                  </TableCell>
+                                  <TableCell>
+                                    <AddressDisplay address={tx.to} />
+                                  </TableCell>
+                                  <TableCell>
+                                    {tx.isError === '1' ? (
+                                      <Badge variant="destructive">
+                                        <AlertTriangle className="w-3 h-3 mr-1" />
+                                        Failed
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="default">Success</Badge>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-        <TabsContent value="real-time">
-          <RealTimeMonitor />
-        </TabsContent>
+            <TabsContent value="monitor" className="space-y-6">
+              <RealTimeMonitor />
+            </TabsContent>
 
-        <TabsContent value="balance">
-          <BalanceTracker />
-        </TabsContent>
+            <TabsContent value="balances" className="space-y-6">
+              <BalanceTracker />
+            </TabsContent>
 
-        <TabsContent value="stablecoin">
-          <StablecoinTransfersTab />
-        </TabsContent>
-
-        <TabsContent value="history">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <HistoryCheck />
-            <AddressDisplay />
-          </div>
-        </TabsContent>
-      </Tabs>
+            <TabsContent value="history" className="space-y-6">
+              <HistoryCheck />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
     </div>
   );
-}
+};
+
+export default Index;
