@@ -42,40 +42,13 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    console.log('Environment check:', {
-      hasBitqueryToken: !!bitqueryToken,
-      hasSupabaseUrl: !!supabaseUrl,
-      hasServiceKey: !!supabaseServiceKey,
-      bitqueryTokenLength: bitqueryToken ? bitqueryToken.length : 0
-    });
-
-    if (!bitqueryToken) {
-      console.error('BITQUERY_TOKEN is missing from environment variables');
-      return new Response(JSON.stringify({ 
-        transfers: [],
-        error: 'BitQuery API token not configured',
-        message: 'API token is required for fetching transfer data'
-      }), {
-        status: 200, // Return 200 to avoid breaking the frontend
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('Missing Supabase configuration');
-      return new Response(JSON.stringify({ 
-        transfers: [],
-        error: 'Database configuration missing',
-        message: 'Database connection not available'
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (!bitqueryToken || !supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing required environment variables');
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log(`Fetching stablecoin transfers from BitQuery for ${network}...`);
+    console.log(`Fetching stablecoin transfers from Bitquery for ${network}...`);
 
     const stablecoinContracts = NETWORK_STABLECOINS[network] || NETWORK_STABLECOINS.eth;
 
@@ -112,7 +85,6 @@ serve(async (req) => {
       }`
     };
 
-    console.log('Making request to BitQuery API...');
     const bitqueryResponse = await fetch('https://streaming.bitquery.io/graphql', {
       method: 'POST',
       headers: {
@@ -124,35 +96,25 @@ serve(async (req) => {
 
     if (!bitqueryResponse.ok) {
       const errorText = await bitqueryResponse.text();
-      console.error('BitQuery API error:', {
-        status: bitqueryResponse.status,
-        statusText: bitqueryResponse.statusText,
-        error: errorText
-      });
-      
+      console.error('Bitquery API error:', errorText);
       return new Response(JSON.stringify({ 
         transfers: [],
-        error: `BitQuery API error: ${bitqueryResponse.status}`,
-        message: bitqueryResponse.status === 401 ? 'Invalid or expired BitQuery token' : 'Failed to fetch from BitQuery API'
+        error: `Bitquery API error: ${bitqueryResponse.status}`,
+        message: 'Failed to fetch from Bitquery API'
       }), {
-        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const bitqueryData = await bitqueryResponse.json();
-    console.log('BitQuery response received:', {
-      hasData: !!bitqueryData.data,
-      hasTransfers: !!bitqueryData.data?.EVM?.Transfers,
-      transferCount: bitqueryData.data?.EVM?.Transfers?.length || 0
-    });
+    console.log('Bitquery response:', JSON.stringify(bitqueryData, null, 2));
 
     if (!bitqueryData.data?.EVM?.Transfers) {
-      console.log('No transfer data in BitQuery response');
+      console.error('Invalid response structure from Bitquery:', bitqueryData);
       return new Response(JSON.stringify({ 
         transfers: [],
-        error: null,
-        message: `No recent transfers found for ${network}`
+        error: 'Invalid response structure from Bitquery',
+        message: 'No transfer data available'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -202,10 +164,9 @@ serve(async (req) => {
     console.error('Error in fetch-stablecoin-transfers function:', error);
     return new Response(JSON.stringify({ 
       error: error.message,
-      transfers: [],
-      message: 'Internal server error occurred'
+      transfers: []
     }), {
-      status: 200, // Return 200 to avoid breaking the frontend
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
