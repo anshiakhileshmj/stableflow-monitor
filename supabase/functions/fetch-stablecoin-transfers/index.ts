@@ -38,12 +38,37 @@ serve(async (req) => {
   try {
     const { network = 'eth' } = await req.json();
     
+    // Get environment variables with better error handling
     const bitqueryToken = Deno.env.get('BITQUERY_TOKEN');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://tnwgnaneejkknokwpkwa.supabase.co';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
 
-    if (!bitqueryToken || !supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing required environment variables');
+    console.log('Environment check:', {
+      hasBitqueryToken: !!bitqueryToken,
+      supabaseUrl: supabaseUrl,
+      hasSupabaseKey: !!supabaseServiceKey
+    });
+
+    if (!bitqueryToken) {
+      console.error('BITQUERY_TOKEN is missing from environment variables');
+      return new Response(JSON.stringify({ 
+        transfers: [],
+        error: 'BITQUERY_TOKEN not configured',
+        message: 'BitQuery API token is required but not found in environment variables'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!supabaseServiceKey) {
+      console.error('Supabase service key is missing from environment variables');
+      return new Response(JSON.stringify({ 
+        transfers: [],
+        error: 'Supabase key not found',
+        message: 'Supabase service key is required but not found in environment variables'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -96,25 +121,34 @@ serve(async (req) => {
 
     if (!bitqueryResponse.ok) {
       const errorText = await bitqueryResponse.text();
-      console.error('Bitquery API error:', errorText);
+      console.error('Bitquery API error:', {
+        status: bitqueryResponse.status,
+        statusText: bitqueryResponse.statusText,
+        error: errorText
+      });
+      
       return new Response(JSON.stringify({ 
         transfers: [],
         error: `Bitquery API error: ${bitqueryResponse.status}`,
-        message: 'Failed to fetch from Bitquery API'
+        message: bitqueryResponse.status === 401 ? 'Invalid or expired BitQuery token' : 'Failed to fetch from Bitquery API'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const bitqueryData = await bitqueryResponse.json();
-    console.log('Bitquery response:', JSON.stringify(bitqueryData, null, 2));
+    console.log('Bitquery response received:', {
+      hasData: !!bitqueryData.data,
+      hasTransfers: !!bitqueryData.data?.EVM?.Transfers,
+      transferCount: bitqueryData.data?.EVM?.Transfers?.length || 0
+    });
 
     if (!bitqueryData.data?.EVM?.Transfers) {
-      console.error('Invalid response structure from Bitquery:', bitqueryData);
+      console.log('No transfer data in response:', bitqueryData);
       return new Response(JSON.stringify({ 
         transfers: [],
-        error: 'Invalid response structure from Bitquery',
-        message: 'No transfer data available'
+        error: null,
+        message: 'No transfers found for this network'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -164,7 +198,8 @@ serve(async (req) => {
     console.error('Error in fetch-stablecoin-transfers function:', error);
     return new Response(JSON.stringify({ 
       error: error.message,
-      transfers: []
+      transfers: [],
+      message: 'Internal server error occurred while fetching transfers'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
