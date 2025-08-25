@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, TrendingUp, RefreshCw } from "lucide-react";
+import { Loader2, TrendingUp, RefreshCw, AlertTriangle } from "lucide-react";
 import AddressDisplay from "@/components/AddressDisplay";
 import { SUPPORTED_NETWORKS } from '@/lib/networks';
 
@@ -24,11 +24,14 @@ const StablecoinTransfersTab = () => {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [isLoadingTransfers, setIsLoadingTransfers] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
   const { toast } = useToast();
 
   const fetchAllNetworkTransfers = async () => {
     setIsLoadingTransfers(true);
+    setErrors([]);
     const allTransfers: Transfer[] = [];
+    const networkErrors: string[] = [];
     
     try {
       console.log('🔍 Fetching stablecoin transfers from all networks...');
@@ -45,6 +48,13 @@ const StablecoinTransfersTab = () => {
           
           if (error) {
             console.error(`Error fetching transfers for ${network.name}:`, error);
+            networkErrors.push(`${network.name}: ${error.message}`);
+            return [];
+          }
+          
+          if (data?.error) {
+            console.warn(`API error for ${network.name}:`, data.error);
+            networkErrors.push(`${network.name}: ${data.message || data.error}`);
             return [];
           }
           
@@ -56,6 +66,7 @@ const StablecoinTransfersTab = () => {
           
         } catch (error) {
           console.error(`Failed to fetch transfers for ${networkKey}:`, error);
+          networkErrors.push(`${SUPPORTED_NETWORKS[networkKey]?.name}: Connection failed`);
           return [];
         }
       });
@@ -70,9 +81,18 @@ const StablecoinTransfersTab = () => {
       
       allTransfers.push(...sortedTransfers);
       setTransfers(allTransfers);
+      setErrors(networkErrors);
       setLastUpdate(new Date());
       
       console.log(`✅ Fetched ${allTransfers.length} transfers from ${networks.length} networks`);
+      
+      if (networkErrors.length > 0 && allTransfers.length === 0) {
+        toast({
+          title: "API Configuration Issue",
+          description: "BitQuery API token may need to be updated. Please check the configuration.",
+          variant: "destructive",
+        });
+      }
       
     } catch (error) {
       console.error('Error fetching transfers from all networks:', error);
@@ -86,13 +106,13 @@ const StablecoinTransfersTab = () => {
     }
   };
 
-  // Auto-fetch on mount and every 15 seconds
+  // Auto-fetch on mount and every 30 seconds (reduced from 15 to avoid rate limiting)
   useEffect(() => {
     fetchAllNetworkTransfers();
     
     const interval = setInterval(() => {
       fetchAllNetworkTransfers();
-    }, 15000); // 15 seconds
+    }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
   }, []);
@@ -131,8 +151,22 @@ const StablecoinTransfersTab = () => {
             </div>
           </CardTitle>
           <CardDescription>
-            Live tracking of stablecoin transfers across all supported blockchains (auto-updates every 15 seconds)
+            Live tracking of stablecoin transfers across all supported blockchains (auto-updates every 30 seconds)
           </CardDescription>
+          {errors.length > 0 && (
+            <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+              <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
+                <AlertTriangle className="w-4 h-4" />
+                <span className="text-sm font-medium">Some networks unavailable:</span>
+              </div>
+              <ul className="mt-1 text-xs text-yellow-700 dark:text-yellow-300">
+                {errors.slice(0, 3).map((error, index) => (
+                  <li key={index}>• {error}</li>
+                ))}
+                {errors.length > 3 && <li>• And {errors.length - 3} more...</li>}
+              </ul>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <div className="max-h-96 overflow-y-auto">
@@ -175,7 +209,10 @@ const StablecoinTransfersTab = () => {
                 {transfers.length === 0 && !isLoadingTransfers && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No transfers found across all networks. Transfers will auto-refresh every 15 seconds.
+                      {errors.length > 0 
+                        ? "No transfers available. Please check API configuration."
+                        : "No transfers found across all networks. Transfers will auto-refresh every 30 seconds."
+                      }
                     </TableCell>
                   </TableRow>
                 )}
