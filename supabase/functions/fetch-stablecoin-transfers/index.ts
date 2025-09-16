@@ -43,7 +43,20 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!bitqueryToken || !supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing required environment variables');
+      const missingVars = [];
+      if (!bitqueryToken) missingVars.push('BITQUERY_TOKEN');
+      if (!supabaseUrl) missingVars.push('SUPABASE_URL');
+      if (!supabaseServiceKey) missingVars.push('SUPABASE_SERVICE_ROLE_KEY');
+      
+      console.error('Missing environment variables:', missingVars.join(', '));
+      return new Response(JSON.stringify({ 
+        transfers: [],
+        error: `Missing environment variables: ${missingVars.join(', ')}`,
+        message: 'Please configure the required environment variables in Supabase Edge Function secrets'
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -164,9 +177,10 @@ serve(async (req) => {
     console.error('Error in fetch-stablecoin-transfers function:', error);
     return new Response(JSON.stringify({ 
       error: error.message,
-      transfers: []
+      transfers: [],
+      message: 'An unexpected error occurred while fetching transfers'
     }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

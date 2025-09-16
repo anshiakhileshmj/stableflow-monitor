@@ -48,6 +48,17 @@ const StablecoinTransfersTab = () => {
             return [];
           }
           
+          // Check if the response contains an error message
+          if (data?.error) {
+            console.error(`API error for ${network.name}:`, data.error, data.message);
+            toast({
+              title: `Error fetching ${network.name} transfers`,
+              description: data.message || data.error,
+              variant: "destructive",
+            });
+            return [];
+          }
+          
           const networkTransfers = Array.isArray(data?.transfers) ? data.transfers : [];
           return networkTransfers.map((transfer: any) => ({
             ...transfer,
@@ -56,6 +67,11 @@ const StablecoinTransfersTab = () => {
           
         } catch (error) {
           console.error(`Failed to fetch transfers for ${networkKey}:`, error);
+          toast({
+            title: `Error fetching ${SUPPORTED_NETWORKS[networkKey]?.name || networkKey} transfers`,
+            description: "Failed to connect to the API",
+            variant: "destructive",
+          });
           return [];
         }
       });
