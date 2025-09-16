@@ -87,7 +87,8 @@ serve(async (req) => {
 async function startRealTimeMonitoring(supabase: any) {
   const bitqueryToken = Deno.env.get('BITQUERY_TOKEN');
   if (!bitqueryToken) {
-    throw new Error('BITQUERY_TOKEN not found');
+    console.error('BITQUERY_TOKEN not found in environment variables');
+    throw new Error('BITQUERY_TOKEN not configured - please add it to Supabase Edge Function secrets');
   }
 
   // Fetch latest transfers every 10 seconds
