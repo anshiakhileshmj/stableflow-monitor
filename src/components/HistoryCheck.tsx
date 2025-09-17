@@ -315,6 +315,14 @@ const HistoryCheck = () => {
               </>
             )}
           </Button>
+          
+          {transactions.length > 20 && (
+            <div className="mt-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                Showing {transactions.length} transactions from selected date range
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -359,7 +367,7 @@ const HistoryCheck = () => {
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">
                     <TrendingDown className="w-4 h-4 text-blue-500" />
-                    <span className="text-sm font-medium">Received</span>
+          <div className="overflow-x-auto">
                   </div>
                   <div className="text-2xl font-bold mt-2">
                     {analytics.receivedTransactions.toLocaleString()}

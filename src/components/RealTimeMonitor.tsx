@@ -503,7 +503,7 @@ const RealTimeMonitor = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="max-h-96 overflow-y-auto">
+                  <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -561,6 +561,14 @@ const RealTimeMonitor = () => {
                       </TableBody>
                     </Table>
                   </div>
+                  
+                  {filteredTransfers.length > 20 && (
+                    <div className="mt-4 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        Showing latest {filteredTransfers.length} transfers
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -573,6 +581,7 @@ const RealTimeMonitor = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -621,6 +630,7 @@ const RealTimeMonitor = () => {
                       )}
                     </TableBody>
                   </Table>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

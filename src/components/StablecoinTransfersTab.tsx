@@ -151,7 +151,7 @@ const StablecoinTransfersTab = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="max-h-96 overflow-y-auto">
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -208,6 +208,14 @@ const StablecoinTransfersTab = () => {
               </TableBody>
             </Table>
           </div>
+          
+          {transfers.length > 10 && (
+            <div className="mt-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                Showing {Math.min(transfers.length, 100)} most recent transfers
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
