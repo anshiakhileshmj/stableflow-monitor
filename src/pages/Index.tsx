@@ -5,12 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Shield, AlertTriangle, TrendingUp, Radio, Wallet, History } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
-import DashboardSidebar from "@/components/DashboardSidebar";
-import DashboardOverview from "@/components/DashboardOverview";
 import RealTimeMonitor from "@/components/RealTimeMonitor";
 import StablecoinTransfersTab from "@/components/StablecoinTransfersTab";
 import BalanceTracker from "@/components/balance-tracker/BalanceTracker";
@@ -57,7 +56,6 @@ interface RiskAnalysis {
 }
 
 const Index = () => {
-  const [activeSection, setActiveSection] = useState("overview");
   const [network, setNetwork] = useState("ethereum");
   const [walletAddress, setWalletAddress] = useState("");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -127,36 +125,46 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
-      <div className="flex h-[calc(100vh-73px)]">
-        <DashboardSidebar 
-          activeSection={activeSection} 
-          onSectionChange={setActiveSection} 
-        />
-        
-        <div className="flex-1 overflow-auto">
-          <div className="p-6">
-            {activeSection === "overview" && <DashboardOverview />}
-            
-            {activeSection === "transfers" && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold">Stablecoin Transfers</h1>
-                  <p className="text-muted-foreground mt-2">
-                    Live tracking of stablecoin transfers across multiple blockchains
-                  </p>
-                </div>
-                <StablecoinTransfersTab />
-              </div>
-            )}
-            
-            {activeSection === "wallet" && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold">Wallet Analysis</h1>
-                  <p className="text-muted-foreground mt-2">
-                    Comprehensive risk assessment and compliance checking
-                  </p>
-                </div>
+      <div className="p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <header className="text-center space-y-2">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              Stablecoin AML Tracker
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Track stablecoin transfers and analyze wallet risk in real-time across multiple blockchains
+            </p>
+          </header>
+
+          <Tabs defaultValue="transfers" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="transfers" className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Stablecoin Transfers
+              </TabsTrigger>
+              <TabsTrigger value="wallet" className="flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                Wallet Analysis
+              </TabsTrigger>
+              <TabsTrigger value="monitor" className="flex items-center gap-2">
+                <Radio className="w-4 h-4" />
+                Real-Time Monitor
+              </TabsTrigger>
+              <TabsTrigger value="balances" className="flex items-center gap-2">
+                <Wallet className="w-4 h-4" />
+                Balance Tracker
+              </TabsTrigger>
+              <TabsTrigger value="history" className="flex items-center gap-2">
+                <History className="w-4 h-4" />
+                History Check
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="transfers" className="space-y-6">
+              <StablecoinTransfersTab />
+            </TabsContent>
+
+            <TabsContent value="wallet" className="space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle>Wallet Risk Analysis</CardTitle>
@@ -409,45 +417,20 @@ const Index = () => {
                   </div>
                 </CardContent>
               </Card>
-              </div>
-            )}
-            
-            {activeSection === "monitor" && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold">Real-Time Monitor</h1>
-                  <p className="text-muted-foreground mt-2">
-                    Live whale transfer detection and alerting system
-                  </p>
-                </div>
-                <RealTimeMonitor />
-              </div>
-            )}
-            
-            {activeSection === "balances" && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold">Balance Tracker</h1>
-                  <p className="text-muted-foreground mt-2">
-                    Real-time wallet balance monitoring across multiple networks
-                  </p>
-                </div>
-                <BalanceTracker />
-              </div>
-            )}
-            
-            {activeSection === "history" && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold">History Check</h1>
-                  <p className="text-muted-foreground mt-2">
-                    Historical transaction analysis and wallet activity review
-                  </p>
-                </div>
-                <HistoryCheck />
-              </div>
-            )}
-          </div>
+            </TabsContent>
+
+            <TabsContent value="monitor" className="space-y-6">
+              <RealTimeMonitor />
+            </TabsContent>
+
+            <TabsContent value="balances" className="space-y-6">
+              <BalanceTracker />
+            </TabsContent>
+
+            <TabsContent value="history" className="space-y-6">
+              <HistoryCheck />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
