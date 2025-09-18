@@ -1,0 +1,1205 @@
+import React, { useState, useEffect } from "react";
+import {
+  Home,
+  DollarSign,
+  Monitor,
+  ShoppingCart,
+  Tag,
+  BarChart3,
+  Users,
+  ChevronDown,
+  ChevronsRight,
+  Moon,
+  Sun,
+  TrendingUp,
+  Activity,
+  Package,
+  Bell,
+  Settings,
+  HelpCircle,
+  User,
+  Coins,
+  Search,
+  Eye,
+  Clock,
+  History,
+  ChevronRight,
+  Wallet,
+  Network,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Globe,
+  Zap,
+  Shield,
+  RefreshCw,
+  Filter,
+  Download,
+  ExternalLink,
+  Copy,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  TrendingDown,
+  MoreVertical
+} from "lucide-react";
+
+interface SidebarOptionProps {
+  Icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  selected: string;
+  setSelected: (title: string) => void;
+  open: boolean;
+  notifs?: number;
+  onClick?: () => void;
+}
+
+interface StablecoinTransfer {
+  id: string;
+  network: string;
+  token: string;
+  amount: string;
+  from: string;
+  to: string;
+  timestamp: string;
+  status: 'completed' | 'pending' | 'failed';
+  txHash: string;
+}
+
+interface WalletAnalysisData {
+  address: string;
+  network: string;
+  balance: string;
+  transactions: number;
+  firstSeen: string;
+  lastActivity: string;
+  riskScore: 'low' | 'medium' | 'high';
+  labels: string[];
+}
+
+interface MonitorAlert {
+  id: string;
+  type: 'large_transfer' | 'new_address' | 'suspicious_activity';
+  message: string;
+  timestamp: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
+interface BalanceData {
+  address: string;
+  network: string;
+  tokens: Array<{
+    symbol: string;
+    balance: string;
+    value: string;
+    change24h: number;
+  }>;
+  totalValue: string;
+  change24h: number;
+}
+
+interface HistoryItem {
+  id: string;
+  type: 'transfer' | 'analysis' | 'monitor' | 'balance';
+  description: string;
+  timestamp: string;
+  status: 'success' | 'error' | 'pending';
+}
+
+const mockTransfers: StablecoinTransfer[] = [
+  {
+    id: "1",
+    network: "Ethereum",
+    token: "USDC",
+    amount: "10,000.00",
+    from: "0x742d35Cc6634C0532925a3b8D4C9db4C4C4C4C4C",
+    to: "0x8ba1f109551bD432803012645Hac136c22C4C4C4",
+    timestamp: "2024-01-15 14:30:25",
+    status: "completed",
+    txHash: "0x1234567890abcdef..."
+  },
+  {
+    id: "2",
+    network: "Polygon",
+    token: "USDT",
+    amount: "5,500.00",
+    from: "0x123d35Cc6634C0532925a3b8D4C9db4C4C4C4C4C",
+    to: "0x456a1f109551bD432803012645Hac136c22C4C4C4",
+    timestamp: "2024-01-15 13:45:12",
+    status: "pending",
+    txHash: "0xabcdef1234567890..."
+  },
+  {
+    id: "3",
+    network: "Arbitrum",
+    token: "DAI",
+    amount: "25,000.00",
+    from: "0x789d35Cc6634C0532925a3b8D4C9db4C4C4C4C4C",
+    to: "0x012a1f109551bD432803012645Hac136c22C4C4C4",
+    timestamp: "2024-01-15 12:20:08",
+    status: "completed",
+    txHash: "0x567890abcdef1234..."
+  }
+];
+
+const mockAlerts: MonitorAlert[] = [
+  {
+    id: "1",
+    type: "large_transfer",
+    message: "Large USDC transfer detected: $50,000",
+    timestamp: "2024-01-15 14:35:00",
+    severity: "high"
+  },
+  {
+    id: "2",
+    type: "suspicious_activity",
+    message: "Multiple small transfers from flagged address",
+    timestamp: "2024-01-15 14:20:00",
+    severity: "medium"
+  },
+  {
+    id: "3",
+    type: "new_address",
+    message: "New high-value address detected",
+    timestamp: "2024-01-15 14:10:00",
+    severity: "low"
+  }
+];
+
+const Component = () => {
+  const [isDark, setIsDark] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>('dashboard');
+  const [walletAddress, setWalletAddress] = useState('');
+  const [selectedNetwork, setSelectedNetwork] = useState('ethereum');
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
+
+  const handleSectionChange = (section: string) => {
+    setActiveSection(section);
+  };
+
+  return (
+    <div className={`flex min-h-screen w-full ${isDark ? 'dark' : ''}`}>
+      <div className="flex w-full bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+        <Sidebar activeSection={activeSection} onSectionChange={handleSectionChange} />
+        <MainContent 
+          isDark={isDark} 
+          setIsDark={setIsDark} 
+          activeSection={activeSection}
+          walletAddress={walletAddress}
+          setWalletAddress={setWalletAddress}
+          selectedNetwork={selectedNetwork}
+          setSelectedNetwork={setSelectedNetwork}
+        />
+      </div>
+    </div>
+  );
+};
+
+const Sidebar = ({ activeSection, onSectionChange }: { activeSection: string; onSectionChange: (section: string) => void }) => {
+  const [open, setOpen] = useState(true);
+
+  return (
+    <nav
+      className={`sticky top-0 h-screen shrink-0 border-r transition-all duration-300 ease-in-out ${
+        open ? 'w-64' : 'w-16'
+      } border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-2 shadow-sm`}
+    >
+      <TitleSection open={open} />
+
+      <div className="space-y-1 mb-8">
+        <Option
+          Icon={Home}
+          title="Dashboard"
+          selected={activeSection}
+          setSelected={onSectionChange}
+          open={open}
+        />
+        <Option
+          Icon={Coins}
+          title="Stablecoin Transfers"
+          selected={activeSection}
+          setSelected={onSectionChange}
+          open={open}
+          onClick={() => onSectionChange('stablecoin-transfers')}
+        />
+        <Option
+          Icon={Search}
+          title="Wallet Analysis"
+          selected={activeSection}
+          setSelected={onSectionChange}
+          open={open}
+          onClick={() => onSectionChange('wallet-analysis')}
+        />
+        <Option
+          Icon={Monitor}
+          title="Real Time Monitor"
+          selected={activeSection}
+          setSelected={onSectionChange}
+          open={open}
+          onClick={() => onSectionChange('real-time-monitor')}
+        />
+        <Option
+          Icon={Wallet}
+          title="Balance Tracker"
+          selected={activeSection}
+          setSelected={onSectionChange}
+          open={open}
+          onClick={() => onSectionChange('balance-tracker')}
+        />
+        <Option
+          Icon={History}
+          title="History Check"
+          selected={activeSection}
+          setSelected={onSectionChange}
+          open={open}
+          onClick={() => onSectionChange('history-check')}
+        />
+      </div>
+
+      {open && (
+        <div className="border-t border-gray-200 dark:border-gray-800 pt-4 space-y-1">
+          <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Account
+          </div>
+          <Option
+            Icon={Settings}
+            title="Settings"
+            selected={activeSection}
+            setSelected={onSectionChange}
+            open={open}
+          />
+          <Option
+            Icon={HelpCircle}
+            title="Help & Support"
+            selected={activeSection}
+            setSelected={onSectionChange}
+            open={open}
+          />
+        </div>
+      )}
+
+      <ToggleClose open={open} setOpen={setOpen} />
+    </nav>
+  );
+};
+
+const Option: React.FC<SidebarOptionProps> = ({ Icon, title, selected, setSelected, open, notifs, onClick }) => {
+  const isSelected = selected === title.toLowerCase().replace(/\s+/g, '-');
+  
+  return (
+    <button
+      onClick={() => {
+        if (onClick) {
+          onClick();
+        } else {
+          setSelected(title.toLowerCase().replace(/\s+/g, '-'));
+        }
+      }}
+      className={`relative flex h-11 w-full items-center rounded-md transition-all duration-200 ${
+        isSelected 
+          ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm border-l-2 border-gray-500 dark:border-gray-400" 
+          : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200"
+      }`}
+    >
+      <div className="grid h-full w-12 place-content-center">
+        <Icon className="h-4 w-4" />
+      </div>
+      
+      {open && (
+        <span
+          className={`text-sm font-medium transition-opacity duration-200 ${
+            open ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          {title}
+        </span>
+      )}
+
+      {notifs && open && (
+        <span className="absolute right-3 flex h-5 w-5 items-center justify-center rounded-full bg-gray-500 dark:bg-gray-600 text-xs text-white font-medium">
+          {notifs}
+        </span>
+      )}
+    </button>
+  );
+};
+
+const TitleSection = ({ open }: { open: boolean }) => {
+  return (
+    <div className="mb-6 border-b border-gray-200 dark:border-gray-800 pb-4">
+      <div className="flex cursor-pointer items-center justify-between rounded-md p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800">
+        <div className="flex items-center gap-3">
+          <Logo />
+          {open && (
+            <div className={`transition-opacity duration-200 ${open ? 'opacity-100' : 'opacity-0'}`}>
+              <div className="flex items-center gap-2">
+                <div>
+                  <span className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    CryptoAnalyzer
+                  </span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400">
+                    Pro Dashboard
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        {open && (
+          <ChevronDown className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+        )}
+      </div>
+    </div>
+  );
+};
+
+const Logo = () => {
+  return (
+    <div className="grid size-10 shrink-0 place-content-center rounded-lg bg-gradient-to-br from-gray-600 to-gray-700 shadow-sm">
+      <Coins className="h-5 w-5 text-white" />
+    </div>
+  );
+};
+
+const ToggleClose = ({ open, setOpen }: { open: boolean; setOpen: (open: boolean) => void }) => {
+  return (
+    <button
+      onClick={() => setOpen(!open)}
+      className="absolute bottom-0 left-0 right-0 border-t border-gray-200 dark:border-gray-800 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+    >
+      <div className="flex items-center p-3">
+        <div className="grid size-10 place-content-center">
+          <ChevronsRight
+            className={`h-4 w-4 transition-transform duration-300 text-gray-500 dark:text-gray-400 ${
+              open ? "rotate-180" : ""
+            }`}
+          />
+        </div>
+        {open && (
+          <span
+            className={`text-sm font-medium text-gray-600 dark:text-gray-300 transition-opacity duration-200 ${
+              open ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            Hide
+          </span>
+        )}
+      </div>
+    </button>
+  );
+};
+
+const MainContent = ({ 
+  isDark, 
+  setIsDark, 
+  activeSection, 
+  walletAddress, 
+  setWalletAddress, 
+  selectedNetwork, 
+  setSelectedNetwork 
+}: { 
+  isDark: boolean; 
+  setIsDark: (dark: boolean) => void; 
+  activeSection: string;
+  walletAddress: string;
+  setWalletAddress: (address: string) => void;
+  selectedNetwork: string;
+  setSelectedNetwork: (network: string) => void;
+}) => {
+  const renderContent = () => {
+    switch (activeSection) {
+      case 'stablecoin-transfers':
+        return <StablecoinTransfersSection />;
+      case 'wallet-analysis':
+        return <WalletAnalysisSection 
+          walletAddress={walletAddress}
+          setWalletAddress={setWalletAddress}
+          selectedNetwork={selectedNetwork}
+          setSelectedNetwork={setSelectedNetwork}
+        />;
+      case 'real-time-monitor':
+        return <RealTimeMonitorSection />;
+      case 'balance-tracker':
+        return <BalanceTrackerSection />;
+      case 'history-check':
+        return <HistoryCheckSection />;
+      default:
+        return <DashboardSection />;
+    }
+  };
+
+  return (
+    <div className="flex-1 bg-gray-50 dark:bg-gray-950 p-6 overflow-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            {activeSection === 'dashboard' ? 'Dashboard' :
+             activeSection === 'stablecoin-transfers' ? 'Stablecoin Transfers' :
+             activeSection === 'wallet-analysis' ? 'Wallet Analysis' :
+             activeSection === 'real-time-monitor' ? 'Real Time Monitor' :
+             activeSection === 'balance-tracker' ? 'Balance Tracker' :
+             activeSection === 'history-check' ? 'History Check' : 'Dashboard'}
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            {activeSection === 'dashboard' ? 'Welcome to your crypto analytics dashboard' :
+             activeSection === 'stablecoin-transfers' ? 'Monitor and analyze stablecoin transactions' :
+             activeSection === 'wallet-analysis' ? 'Analyze wallet addresses across multiple networks' :
+             activeSection === 'real-time-monitor' ? 'Real-time monitoring of blockchain activities' :
+             activeSection === 'balance-tracker' ? 'Track wallet balances and portfolio values' :
+             activeSection === 'history-check' ? 'View historical data and transaction records' : 'Analytics dashboard'}
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <button className="relative p-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+            <Bell className="h-5 w-5" />
+            <span className="absolute -top-1 -right-1 h-3 w-3 bg-gray-500 rounded-full"></span>
+          </button>
+          <button
+            onClick={() => setIsDark(!isDark)}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          >
+            {isDark ? (
+              <Sun className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
+            )}
+          </button>
+          <button className="p-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+            <User className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+      
+      {renderContent()}
+    </div>
+  );
+};
+
+const DashboardSection = () => {
+  return (
+    <>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+              <Coins className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            </div>
+            <TrendingUp className="h-4 w-4 text-gray-500" />
+          </div>
+          <h3 className="font-medium text-gray-600 dark:text-gray-400 mb-1">Total Transfers</h3>
+          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">1,234</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">+12% from last month</p>
+        </div>
+        
+        <div className="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+              <Search className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            </div>
+            <TrendingUp className="h-4 w-4 text-gray-500" />
+          </div>
+          <h3 className="font-medium text-gray-600 dark:text-gray-400 mb-1">Wallets Analyzed</h3>
+          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">567</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">+8% from last week</p>
+        </div>
+        
+        <div className="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+              <Monitor className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            </div>
+            <TrendingUp className="h-4 w-4 text-gray-500" />
+          </div>
+          <h3 className="font-medium text-gray-600 dark:text-gray-400 mb-1">Active Monitors</h3>
+          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">89</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">+3 new this week</p>
+        </div>
+
+        <div className="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+              <Wallet className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            </div>
+            <TrendingUp className="h-4 w-4 text-gray-500" />
+          </div>
+          <h3 className="font-medium text-gray-600 dark:text-gray-400 mb-1">Tracked Balances</h3>
+          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">$2.4M</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">+15% portfolio growth</p>
+        </div>
+      </div>
+      
+      {/* Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Recent Activity */}
+        <div className="lg:col-span-2">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent Activity</h3>
+              <button className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium">
+                View all
+              </button>
+            </div>
+            <div className="space-y-4">
+              {[
+                { icon: Coins, title: "Large USDC transfer detected", desc: "$50,000 from Binance to unknown wallet", time: "2 min ago", color: "gray" },
+                { icon: Search, title: "Wallet analysis completed", desc: "High-risk wallet flagged for review", time: "5 min ago", color: "gray" },
+                { icon: Monitor, title: "Real-time alert triggered", desc: "Suspicious activity on monitored address", time: "10 min ago", color: "gray" },
+                { icon: Wallet, title: "Balance update", desc: "Portfolio value increased by 5.2%", time: "1 hour ago", color: "gray" },
+                { icon: History, title: "Historical data sync", desc: "Transaction history updated", time: "2 hours ago", color: "gray" },
+              ].map((activity, i) => (
+                <div key={i} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer">
+                  <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800">
+                    <activity.icon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                      {activity.title}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {activity.desc}
+                    </p>
+                  </div>
+                  <div className="text-xs text-gray-400 dark:text-gray-500">
+                    {activity.time}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="space-y-6">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Network Distribution</h3>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Ethereum</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">45%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="bg-gray-500 h-2 rounded-full" style={{ width: '45%' }}></div>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Polygon</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">25%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="bg-gray-500 h-2 rounded-full" style={{ width: '25%' }}></div>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Arbitrum</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">20%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="bg-gray-500 h-2 rounded-full" style={{ width: '20%' }}></div>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Others</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">10%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="bg-gray-500 h-2 rounded-full" style={{ width: '10%' }}></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Top Stablecoins</h3>
+            <div className="space-y-3">
+              {['USDC', 'USDT', 'DAI', 'BUSD'].map((token, i) => (
+                <div key={i} className="flex items-center justify-between py-2">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{token}</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    ${Math.floor(Math.random() * 1000000 + 500000).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+const StablecoinTransfersSection = () => {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
+            <Filter className="h-4 w-4" />
+            Filter
+          </button>
+          <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
+            <Download className="h-4 w-4" />
+            Export
+          </button>
+        </div>
+        <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-200">
+          <RefreshCw className="h-4 w-4" />
+          Refresh
+        </button>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Network</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Token</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">From</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">To</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Timestamp</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {mockTransfers.map((transfer) => (
+                <tr key={transfer.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <Network className="h-4 w-4 text-gray-400 mr-2" />
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{transfer.network}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-gray-900 dark:text-gray-100">{transfer.token}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">${transfer.amount}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-gray-500 dark:text-gray-400 font-mono">{transfer.from.slice(0, 10)}...</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-gray-500 dark:text-gray-400 font-mono">{transfer.to.slice(0, 10)}...</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">{transfer.timestamp}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                      transfer.status === 'completed' ? 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200' :
+                      transfer.status === 'pending' ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400' :
+                      'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500'
+                    }`}>
+                      {transfer.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <button className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <Copy className="h-4 w-4" />
+                      </button>
+                      <button className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <ExternalLink className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const WalletAnalysisSection = ({ 
+  walletAddress, 
+  setWalletAddress, 
+  selectedNetwork, 
+  setSelectedNetwork 
+}: {
+  walletAddress: string;
+  setWalletAddress: (address: string) => void;
+  selectedNetwork: string;
+  setSelectedNetwork: (network: string) => void;
+}) => {
+  const [analysisResult, setAnalysisResult] = useState<WalletAnalysisData | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const handleAnalyze = async () => {
+    if (!walletAddress) return;
+    
+    setIsAnalyzing(true);
+    // Simulate API call
+    setTimeout(() => {
+      setAnalysisResult({
+        address: walletAddress,
+        network: selectedNetwork,
+        balance: "$125,432.50",
+        transactions: 1247,
+        firstSeen: "2023-01-15",
+        lastActivity: "2024-01-15 14:30:25",
+        riskScore: "low",
+        labels: ["Exchange", "High Volume", "Verified"]
+      });
+      setIsAnalyzing(false);
+    }, 2000);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Analyze Wallet Address</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Wallet Address
+            </label>
+            <input
+              type="text"
+              value={walletAddress}
+              onChange={(e) => setWalletAddress(e.target.value)}
+              placeholder="Enter wallet address (0x...)"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Network
+            </label>
+            <select
+              value={selectedNetwork}
+              onChange={(e) => setSelectedNetwork(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+            >
+              <option value="ethereum">Ethereum</option>
+              <option value="polygon">Polygon</option>
+              <option value="avalanche">Avalanche</option>
+              <option value="arbitrum">Arbitrum</option>
+              <option value="xrp">XRP Ledger</option>
+            </select>
+          </div>
+        </div>
+        
+        <button
+          onClick={handleAnalyze}
+          disabled={!walletAddress || isAnalyzing}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isAnalyzing ? (
+            <>
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Analyzing...
+            </>
+          ) : (
+            <>
+              <Search className="h-4 w-4" />
+              Analyze Wallet
+            </>
+          )}
+        </button>
+      </div>
+
+      {analysisResult && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Wallet Overview</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">Address</label>
+                <p className="text-sm font-mono text-gray-900 dark:text-gray-100 break-all">{analysisResult.address}</p>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">Network</label>
+                <p className="text-sm text-gray-900 dark:text-gray-100 capitalize">{analysisResult.network}</p>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">Current Balance</label>
+                <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{analysisResult.balance}</p>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">Total Transactions</label>
+                <p className="text-sm text-gray-900 dark:text-gray-100">{analysisResult.transactions.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Risk Assessment</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">Risk Score</label>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                    analysisResult.riskScore === 'low' ? 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200' :
+                    analysisResult.riskScore === 'medium' ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400' :
+                    'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500'
+                  }`}>
+                    {analysisResult.riskScore.toUpperCase()}
+                  </span>
+                  {analysisResult.riskScore === 'low' && <CheckCircle className="h-4 w-4 text-gray-500" />}
+                  {analysisResult.riskScore === 'medium' && <AlertCircle className="h-4 w-4 text-gray-400" />}
+                  {analysisResult.riskScore === 'high' && <AlertCircle className="h-4 w-4 text-gray-300" />}
+                </div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">Labels</label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {analysisResult.labels.map((label, index) => (
+                    <span key={index} className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">First Seen</label>
+                <p className="text-sm text-gray-900 dark:text-gray-100">{analysisResult.firstSeen}</p>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">Last Activity</label>
+                <p className="text-sm text-gray-900 dark:text-gray-100">{analysisResult.lastActivity}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const RealTimeMonitorSection = () => {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="h-3 w-3 bg-gray-500 rounded-full animate-pulse"></div>
+            <span className="text-sm text-gray-600 dark:text-gray-400">Live Monitoring Active</span>
+          </div>
+        </div>
+        <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-200">
+          <Zap className="h-4 w-4" />
+          Add Monitor
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Live Alerts</h3>
+            <div className="space-y-4">
+              {mockAlerts.map((alert) => (
+                <div key={alert.id} className="flex items-start space-x-4 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
+                  <div className={`p-2 rounded-lg ${
+                    alert.severity === 'high' ? 'bg-gray-100 dark:bg-gray-800' :
+                    alert.severity === 'medium' ? 'bg-gray-100 dark:bg-gray-800' :
+                    'bg-gray-100 dark:bg-gray-800'
+                  }`}>
+                    {alert.type === 'large_transfer' && <ArrowUpDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />}
+                    {alert.type === 'suspicious_activity' && <Shield className="h-4 w-4 text-gray-600 dark:text-gray-400" />}
+                    {alert.type === 'new_address' && <User className="h-4 w-4 text-gray-600 dark:text-gray-400" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {alert.message}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {alert.timestamp}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                      alert.severity === 'high' ? 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200' :
+                      alert.severity === 'medium' ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400' :
+                      'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500'
+                    }`}>
+                      {alert.severity}
+                    </span>
+                    <button className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Monitor Stats</h3>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Active Monitors</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">24</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Alerts Today</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">12</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">High Priority</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">3</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Response Time</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">&lt; 1s</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Alert Types</h3>
+            <div className="space-y-3">
+              {[
+                { type: 'Large Transfers', count: 8, icon: ArrowUpDown },
+                { type: 'Suspicious Activity', count: 3, icon: Shield },
+                { type: 'New Addresses', count: 1, icon: User }
+              ].map((item, i) => (
+                <div key={i} className="flex items-center justify-between py-2">
+                  <div className="flex items-center gap-2">
+                    <item.icon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{item.type}</span>
+                  </div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const BalanceTrackerSection = () => {
+  const mockBalanceData: BalanceData = {
+    address: "0x742d35Cc6634C0532925a3b8D4C9db4C4C4C4C4C",
+    network: "ethereum",
+    tokens: [
+      { symbol: "ETH", balance: "12.5", value: "$40,875.00", change24h: 2.3 },
+      { symbol: "USDC", balance: "25,000", value: "$25,000.00", change24h: 0.1 },
+      { symbol: "USDT", balance: "15,000", value: "$15,000.00", change24h: -0.05 },
+      { symbol: "DAI", balance: "8,500", value: "$8,500.00", change24h: 0.2 }
+    ],
+    totalValue: "$89,375.00",
+    change24h: 1.8
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Portfolio Balance</h3>
+              <button className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </button>
+            </div>
+            
+            <div className="mb-6">
+              <div className="flex items-center gap-4 mb-2">
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{mockBalanceData.totalValue}</h2>
+                <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${
+                  mockBalanceData.change24h >= 0 
+                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200' 
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                }`}>
+                  {mockBalanceData.change24h >= 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                  <span className="text-sm font-medium">{Math.abs(mockBalanceData.change24h)}%</span>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400">24h change</p>
+            </div>
+
+            <div className="space-y-4">
+              {mockBalanceData.tokens.map((token, index) => (
+                <div key={index} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{token.symbol}</span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{token.symbol}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{token.balance} {token.symbol}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{token.value}</p>
+                    <div className={`flex items-center gap-1 justify-end ${
+                      token.change24h >= 0 ? 'text-gray-600 dark:text-gray-400' : 'text-gray-500 dark:text-gray-500'
+                    }`}>
+                      {token.change24h >= 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                      <span className="text-sm">{Math.abs(token.change24h)}%</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Wallet Info</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">Address</label>
+                <p className="text-sm font-mono text-gray-900 dark:text-gray-100 break-all">{mockBalanceData.address}</p>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">Network</label>
+                <p className="text-sm text-gray-900 dark:text-gray-100 capitalize">{mockBalanceData.network}</p>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 dark:text-gray-400">Last Updated</label>
+                <p className="text-sm text-gray-900 dark:text-gray-100">Just now</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h3>
+            <div className="space-y-2">
+              <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                <Download className="h-4 w-4" />
+                Export Portfolio
+              </button>
+              <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                <Bell className="h-4 w-4" />
+                Set Price Alerts
+              </button>
+              <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                <Eye className="h-4 w-4" />
+                Add to Watchlist
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const HistoryCheckSection = () => {
+  const mockHistory: HistoryItem[] = [
+    {
+      id: "1",
+      type: "transfer",
+      description: "Analyzed USDC transfer of $50,000",
+      timestamp: "2024-01-15 14:30:25",
+      status: "success"
+    },
+    {
+      id: "2",
+      type: "analysis",
+      description: "Wallet risk assessment completed",
+      timestamp: "2024-01-15 13:45:12",
+      status: "success"
+    },
+    {
+      id: "3",
+      type: "monitor",
+      description: "Real-time alert triggered",
+      timestamp: "2024-01-15 12:20:08",
+      status: "success"
+    },
+    {
+      id: "4",
+      type: "balance",
+      description: "Portfolio balance updated",
+      timestamp: "2024-01-15 11:15:33",
+      status: "success"
+    },
+    {
+      id: "5",
+      type: "analysis",
+      description: "Failed to analyze wallet address",
+      timestamp: "2024-01-15 10:30:45",
+      status: "error"
+    }
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
+            <Filter className="h-4 w-4" />
+            Filter by Type
+          </button>
+          <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
+            <Clock className="h-4 w-4" />
+            Last 30 Days
+          </button>
+        </div>
+        <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
+          <Download className="h-4 w-4" />
+          Export History
+        </button>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Activity History</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Complete record of all your activities</p>
+        </div>
+        
+        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+          {mockHistory.map((item) => (
+            <div key={item.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-800">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <div className={`p-2 rounded-lg ${
+                    item.type === 'transfer' ? 'bg-gray-100 dark:bg-gray-800' :
+                    item.type === 'analysis' ? 'bg-gray-100 dark:bg-gray-800' :
+                    item.type === 'monitor' ? 'bg-gray-100 dark:bg-gray-800' :
+                    'bg-gray-100 dark:bg-gray-800'
+                  }`}>
+                    {item.type === 'transfer' && <ArrowUpDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />}
+                    {item.type === 'analysis' && <Search className="h-4 w-4 text-gray-600 dark:text-gray-400" />}
+                    {item.type === 'monitor' && <Monitor className="h-4 w-4 text-gray-600 dark:text-gray-400" />}
+                    {item.type === 'balance' && <Wallet className="h-4 w-4 text-gray-600 dark:text-gray-400" />}
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{item.description}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{item.timestamp}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                    item.status === 'success' ? 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200' :
+                    item.status === 'error' ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400' :
+                    'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500'
+                  }`}>
+                    {item.status}
+                  </span>
+                  {item.status === 'success' && <CheckCircle className="h-4 w-4 text-gray-500" />}
+                  {item.status === 'error' && <AlertCircle className="h-4 w-4 text-gray-400" />}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Component;
