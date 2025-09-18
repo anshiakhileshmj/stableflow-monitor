@@ -2,7 +2,6 @@
 import { useState } from "react";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import DashboardHeader from "@/components/DashboardHeader";
-import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import StablecoinTransfersDashboard from "@/components/dashboard/StablecoinTransfersDashboard";
 import WalletAnalysisDashboard from "@/components/dashboard/WalletAnalysisDashboard";
 import RealTimeMonitorDashboard from "@/components/dashboard/RealTimeMonitorDashboard";
@@ -10,7 +9,7 @@ import BalanceTrackerDashboard from "@/components/dashboard/BalanceTrackerDashbo
 import HistoryCheckDashboard from "@/components/dashboard/HistoryCheckDashboard";
 
 const Index = () => {
-  const [activeSection, setActiveSection] = useState<string>('dashboard');
+  const [activeSection, setActiveSection] = useState<string>('stablecoin-transfers');
 
   const handleSectionChange = (section: string) => {
     setActiveSection(section);
@@ -29,7 +28,7 @@ const Index = () => {
       case 'history-check':
         return <HistoryCheckDashboard />;
       default:
-        return <DashboardOverview />;
+        return <StablecoinTransfersDashboard />;
     }
   };
 

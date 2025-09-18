@@ -146,13 +146,6 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ activeSection, onSe
 
       <div className="space-y-1 mb-8">
         <Option
-          Icon={Home}
-          title="Dashboard"
-          selected={activeSection}
-          setSelected={onSectionChange}
-          open={open}
-        />
-        <Option
           Icon={Coins}
           title="Stablecoin Transfers"
           selected={activeSection}
