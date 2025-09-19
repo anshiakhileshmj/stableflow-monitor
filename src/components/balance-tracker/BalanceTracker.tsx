@@ -4,13 +4,12 @@ import { useRealTimeBalance } from '@/hooks/useRealTimeBalance';
 import { useWalletStorage } from '@/hooks/useWalletStorage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Wallet, TrendingUp, Radio } from 'lucide-react';
-import { SUPPORTED_NETWORKS } from '@/lib/networks';
-import { NETWORK_LOGOS } from '@/lib/network-logos';
+import { Loader2, Wallet, TrendingUp, Plus } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import WalletBalanceCard from './WalletBalanceCard';
-import AddWalletForm from './AddWalletForm';
 
 interface WalletData {
   id: string;
@@ -20,7 +19,13 @@ interface WalletData {
 }
 
 const BalanceTracker = () => {
-  const [selectedNetwork, setSelectedNetwork] = useState('ethereum');
+  const [formData, setFormData] = useState({
+    address: '',
+    name: ''
+  });
+  const [isValidating, setIsValidating] = useState(false);
+  const { toast } = useToast();
+  
   const { 
     wallets, 
     addWallet, 
@@ -34,7 +39,7 @@ const BalanceTracker = () => {
     lastUpdate,
     startTracking,
     stopTracking 
-  } = useRealTimeBalance(wallets, selectedNetwork);
+  } = useRealTimeBalance(wallets, 'ethereum');
 
   // Start tracking when wallets are loaded
   useEffect(() => {
@@ -42,13 +47,54 @@ const BalanceTracker = () => {
       startTracking();
     }
     return () => stopTracking();
-  }, [wallets, selectedNetwork, startTracking, stopTracking]);
+  }, [wallets, startTracking, stopTracking]);
 
-  const handleAddWallet = async (walletData: Omit<WalletData, 'id'>) => {
-    await addWallet({
-      ...walletData,
-      network: selectedNetwork
-    });
+  const validateAddress = (address: string) => {
+    // Support multiple blockchain address formats
+    const ethereumPattern = /^0x[a-fA-F0-9]{40}$/;
+    const xrpPattern = /^r[0-9A-Za-z]{24,34}$/;
+    const bitcoinPattern = /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
+    
+    return ethereumPattern.test(address) || xrpPattern.test(address) || bitcoinPattern.test(address);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateAddress(formData.address)) {
+      toast({
+        title: "Invalid Address",
+        description: "Please enter a valid wallet address (supports Ethereum, XRP, Bitcoin formats)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsValidating(true);
+
+    try {
+      await addWallet({
+        address: formData.address.toLowerCase(),
+        name: formData.name || undefined,
+        network: 'auto' // Auto-detect network based on address format
+      });
+
+      // Reset form
+      setFormData({ address: '', name: '' });
+      
+      toast({
+        title: "Wallet Added",
+        description: "Wallet has been added to tracking list across all supported blockchains",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to add wallet: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsValidating(false);
+    }
   };
 
   return (
@@ -62,7 +108,7 @@ const BalanceTracker = () => {
                 Real-Time Balance Tracker
               </CardTitle>
               <CardDescription>
-                Monitor wallet balances across multiple networks in real-time
+                Monitor wallet balances across all known blockchains in real-time
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -81,39 +127,57 @@ const BalanceTracker = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">Network:</label>
-              <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
-                <SelectTrigger className="w-56">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(SUPPORTED_NETWORKS).map(network => (
-                    <SelectItem key={network.id} value={network.id}>
-                      <div className="flex items-center gap-2 justify-between w-full">
-                        <div className="flex items-center gap-2">
-                          {NETWORK_LOGOS[network.id] && (
-                            <img src={NETWORK_LOGOS[network.id]} alt={network.name + ' logo'} className="w-5 h-5" />
-                          )}
-                          <span>{network.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            ({network.nativeCurrency.symbol})
-                          </span>
-                        </div>
-                        {selectedNetwork === network.id && (
-                          <svg className="w-5 h-5 text-primary font-bold ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <form onSubmit={handleSubmit} className="space-y-4 p-4 border rounded-lg bg-muted/30">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="address">Wallet Address *</Label>
+                <Input
+                  id="address"
+                  type="text"
+                  placeholder="Enter wallet address (0x... XRP, BTC addresses supported)"
+                  value={formData.address}
+                  onChange={(e) => setFormData({
+                    ...formData, 
+                    address: e.target.value
+                  })}
+                  required
+                  className="font-mono"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="name">Wallet Name (Optional)</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="My Wallet"
+                  value={formData.name}
+                  onChange={(e) => setFormData({
+                    ...formData, 
+                    name: e.target.value
+                  })}
+                />
+              </div>
             </div>
-            <AddWalletForm onAddWallet={handleAddWallet} />
-          </div>
+            
+            <Button 
+              type="submit" 
+              disabled={isValidating}
+              className="w-full flex items-center gap-2"
+            >
+              {isValidating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Adding Wallet...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  Add Wallet to Track
+                </>
+              )}
+            </Button>
+          </form>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {storageLoading ? (
@@ -148,11 +212,9 @@ const BalanceTracker = () => {
               <Badge variant="secondary">{wallets.length}</Badge>
             </div>
             <div className="flex items-center gap-2">
-              <Radio className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Network:</span>
-              <Badge variant="outline">
-                {SUPPORTED_NETWORKS[selectedNetwork]?.name || selectedNetwork.toUpperCase()}
-              </Badge>
+              <Wallet className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Multi-Blockchain Support:</span>
+              <Badge variant="outline">All Networks</Badge>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Active Balances:</span>
