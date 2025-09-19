@@ -8,8 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Shield, AlertTriangle, TrendingUp } from "lucide-react";
 import AddressDisplay from "@/components/AddressDisplay";
-import NetworkSelector from "@/components/NetworkSelector";
-import { SUPPORTED_NETWORKS } from '@/lib/networks';
 
 interface Transaction {
   hash: string;
@@ -49,7 +47,6 @@ interface RiskAnalysis {
 }
 
 const WalletAnalysisDashboard = () => {
-  const [network, setNetwork] = useState("ethereum");
   const [walletAddress, setWalletAddress] = useState("");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [tokenTransfers, setTokenTransfers] = useState<TokenTransfer[]>([]);
@@ -72,7 +69,7 @@ const WalletAnalysisDashboard = () => {
     setIsAnalyzingWallet(true);
     try {
       const { data, error } = await supabase.functions.invoke('analyze-wallet', {
-        body: { walletAddress: walletAddress.trim(), network }
+        body: { walletAddress: walletAddress.trim() }
       });
       
       if (error) throw error;
@@ -84,13 +81,13 @@ const WalletAnalysisDashboard = () => {
       setRiskAnalysis(data.riskAnalysis);
       toast({
         title: "Analysis Complete",
-        description: `Analyzed ${data.transactions?.length || 0} transactions, ${data.tokenTransfers?.length || 0} token transfers on ${SUPPORTED_NETWORKS[network]?.name || network}`,
+        description: `Analyzed ${data.transactions?.length || 0} transactions, ${data.tokenTransfers?.length || 0} token transfers across multiple blockchains`,
       });
     } catch (error) {
       console.error('Error analyzing wallet:', error);
       toast({
         title: "Error",
-        description: `Failed to analyze wallet on ${SUPPORTED_NETWORKS[network]?.name || network}`,
+        description: "Failed to analyze wallet across blockchains",
         variant: "destructive",
       });
     } finally {
@@ -112,7 +109,7 @@ const WalletAnalysisDashboard = () => {
   };
 
   const getNativeSymbol = () => {
-    return SUPPORTED_NETWORKS[network]?.nativeCurrency.symbol || 'TOKEN';
+    return 'ETH';
   };
 
   return (
@@ -121,27 +118,18 @@ const WalletAnalysisDashboard = () => {
         <CardHeader>
           <CardTitle>Wallet Risk Analysis</CardTitle>
           <CardDescription>
-            Analyze wallets for AML compliance and risk factors across multiple blockchains
+            Analyze wallets for AML compliance and risk factors across all known blockchains
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Wallet Address</label>
-              <Input
-                placeholder="Enter wallet address (0x... or XRP address)"
-                value={walletAddress}
-                onChange={(e) => setWalletAddress(e.target.value)}
-                className="font-mono"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Network</label>
-              <NetworkSelector
-                value={network}
-                onValueChange={setNetwork}
-              />
-            </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Wallet Address</label>
+            <Input
+              placeholder="Enter wallet address (0x... or XRP address)"
+              value={walletAddress}
+              onChange={(e) => setWalletAddress(e.target.value)}
+              className="font-mono"
+            />
           </div>
 
           <Button 
@@ -152,7 +140,7 @@ const WalletAnalysisDashboard = () => {
             {isAnalyzingWallet ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analyzing on {SUPPORTED_NETWORKS[network]?.name}...
+                Analyzing across all blockchains...
               </>
             ) : (
               <>
@@ -185,7 +173,7 @@ const WalletAnalysisDashboard = () => {
                   <div className="text-2xl font-bold">
                     {parseFloat(walletBalance).toFixed(4)} {getNativeSymbol()}
                   </div>
-                  <div className="text-xs text-muted-foreground">{SUPPORTED_NETWORKS[network]?.name}</div>
+                  <div className="text-xs text-muted-foreground">Primary Balance</div>
                 </CardContent>
               </Card>
 
@@ -222,7 +210,7 @@ const WalletAnalysisDashboard = () => {
             {transactions.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Recent Transactions (Last 100) - {SUPPORTED_NETWORKS[network]?.name}</CardTitle>
+                  <CardTitle>Recent Transactions (Last 100)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="max-h-96 overflow-y-auto">
@@ -277,7 +265,7 @@ const WalletAnalysisDashboard = () => {
             {tokenTransfers.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Token Transfers - {SUPPORTED_NETWORKS[network]?.name}</CardTitle>
+                  <CardTitle>Token Transfers</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -321,7 +309,7 @@ const WalletAnalysisDashboard = () => {
             {internalTransactions.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Internal Transactions - {SUPPORTED_NETWORKS[network]?.name}</CardTitle>
+                  <CardTitle>Internal Transactions</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Table>
