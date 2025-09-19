@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, TrendingUp, RefreshCw } from "lucide-react";
 import AddressDisplay from "@/components/AddressDisplay";
 import { SUPPORTED_NETWORKS } from '@/lib/networks';
+import { NETWORK_LOGOS } from '@/lib/network-logos';
 
 interface Transfer {
   tokenSymbol: string;
@@ -119,97 +120,96 @@ const StablecoinTransfersTab = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
-              Recent Stablecoin Transfers
-            </div>
-            <div className="flex items-center gap-4">
-              {lastUpdate && (
-                <div className="text-sm text-muted-foreground">
-                  Last updated: {lastUpdate.toLocaleTimeString()}
-                </div>
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-5 h-5" />
+            <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent Stablecoin Transfers</span>
+          </div>
+          <div className="flex items-center gap-4">
+            {lastUpdate && (
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Last updated: {lastUpdate.toLocaleTimeString()}
+              </div>
+            )}
+            <button
+              onClick={fetchAllNetworkTransfers}
+              disabled={isLoadingTransfers}
+              className="flex items-center gap-2 px-3 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-200"
+            >
+              {isLoadingTransfers ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
               )}
-              <Button 
-                onClick={fetchAllNetworkTransfers}
-                disabled={isLoadingTransfers}
-                size="sm"
-                variant="outline"
-              >
-                {isLoadingTransfers ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
-          </CardTitle>
-          <CardDescription>
-            Live tracking of stablecoin transfers across all supported blockchains (auto-updates every 15 seconds)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="max-h-96 overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Network</TableHead>
-                  <TableHead>Token</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>From</TableHead>
-                  <TableHead>To</TableHead>
-                  <TableHead>Timestamp</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            </button>
+          </div>
+        </div>
+        <div className="px-6 pb-6 pt-2">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Network</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Token</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Amount</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">From</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">To</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody>
                 {transfers.map((transfer, index) => (
-                  <TableRow key={`${transfer.network}-${index}`}>
-                    <TableCell>
-                      <Badge variant="secondary" className="text-xs">
+                  <tr key={`${transfer.network}-${index}`} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <td className="px-4 py-2">
+                      <span className="inline-flex items-center gap-2 px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 text-xs font-medium text-gray-700 dark:text-gray-300">
+                        {NETWORK_LOGOS[transfer.network] && (
+                          <img src={NETWORK_LOGOS[transfer.network]} alt={transfer.network + ' logo'} className="w-5 h-5 inline-block" />
+                        )}
                         {SUPPORTED_NETWORKS[transfer.network]?.name || transfer.network}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{transfer.tokenSymbol}</Badge>
-                    </TableCell>
-                    <TableCell className="font-mono">
+                      </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className="inline-block px-2 py-1 rounded border border-gray-300 dark:border-gray-700 text-xs font-medium text-gray-900 dark:text-gray-100">
+                        {transfer.tokenSymbol}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">
                       {parseFloat(transfer.amount).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="px-4 py-2">
                       <AddressDisplay address={transfer.senderAddress} />
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="px-4 py-2">
                       <AddressDisplay address={transfer.receiverAddress} />
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400">
                       {formatTimestamp(transfer.timestamp)}
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))}
                 {transfers.length === 0 && !isLoadingTransfers && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">
                       No transfers found across all networks. Transfers will auto-refresh every 15 seconds.
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 )}
                 {isLoadingTransfers && transfers.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
+                  <tr>
+                    <td colSpan={6} className="text-center py-8">
                       <div className="flex items-center justify-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span className="text-muted-foreground">Fetching transfers from all networks...</span>
+                        <span className="text-gray-500 dark:text-gray-400">Fetching transfers from all networks...</span>
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 )}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };
