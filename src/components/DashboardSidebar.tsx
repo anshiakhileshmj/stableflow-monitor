@@ -189,9 +189,12 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ activeSection, onSe
 
       {open && (
         <div className="border-t pt-4 space-y-1">
+          {/*
           <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Account
           </div>
+          */}
+          {/*
           <Option
             Icon={Settings}
             title="Settings"
@@ -206,6 +209,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ activeSection, onSe
             setSelected={onSectionChange}
             open={open}
           />
+          */}
         </div>
       )}
 
