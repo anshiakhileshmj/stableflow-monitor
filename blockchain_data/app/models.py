@@ -12,14 +12,19 @@ SCHEMA_SQL = {
 		to_address TEXT,
 		amount NUMERIC,
 		tx_hash TEXT,
+		log_index BIGINT,
 		block_number BIGINT,
 		block_timestamp TIMESTAMP,
 		gas_used NUMERIC,
 		gas_price NUMERIC,
 		gas_fee NUMERIC,
 		status TEXT,
-		inserted_at TIMESTAMP DEFAULT now()
+		inserted_at TIMESTAMP DEFAULT now(),
+		UNIQUE (tx_hash, log_index)
 	);
+	CREATE INDEX IF NOT EXISTS idx_transfers_block_ts ON stablecoin_transfers(block_timestamp DESC);
+	CREATE INDEX IF NOT EXISTS idx_transfers_token ON stablecoin_transfers(token);
+	CREATE INDEX IF NOT EXISTS idx_transfers_network ON stablecoin_transfers(network);
 	""",
 	"wallet_balances": """
 	CREATE TABLE IF NOT EXISTS wallet_balances (
@@ -31,6 +36,7 @@ SCHEMA_SQL = {
 		balance NUMERIC NOT NULL,
 		fetched_at TIMESTAMP NOT NULL DEFAULT now()
 	);
+	CREATE INDEX IF NOT EXISTS idx_balances_wallet_time ON wallet_balances(wallet_address, fetched_at DESC);
 	""",
 	"whale_transfers": """
 	CREATE TABLE IF NOT EXISTS whale_transfers (
@@ -42,14 +48,17 @@ SCHEMA_SQL = {
 		to_address TEXT NOT NULL,
 		amount NUMERIC NOT NULL,
 		tx_hash TEXT NOT NULL,
+		log_index BIGINT,
 		block_number BIGINT NOT NULL,
 		block_timestamp TIMESTAMP NOT NULL,
 		gas_used NUMERIC,
 		gas_price NUMERIC,
 		gas_fee NUMERIC,
 		status TEXT,
-		inserted_at TIMESTAMP DEFAULT now()
+		inserted_at TIMESTAMP DEFAULT now(),
+		UNIQUE (tx_hash, log_index)
 	);
+	CREATE INDEX IF NOT EXISTS idx_whales_block_ts ON whale_transfers(block_timestamp DESC);
 	""",
 	"whale_top_wallets": """
 	CREATE TABLE IF NOT EXISTS whale_top_wallets (
@@ -61,6 +70,7 @@ SCHEMA_SQL = {
 		total_received NUMERIC,
 		last_updated TIMESTAMP DEFAULT now()
 	);
+	CREATE INDEX IF NOT EXISTS idx_whale_top_token ON whale_top_wallets(token);
 	""",
 	"api_keys": """
 	CREATE TABLE IF NOT EXISTS api_keys (
@@ -113,7 +123,6 @@ STABLECOINS: Dict[str, Dict[str, Tuple[str, int]]] = {
 		"Ethereum": ("0xa47c8bf37f92abed4a126bda807a7b7498661acd", 18),
 		"Polygon": ("0x692597b009d13c4049a947cab2239b7d6517875f", 6),
 	},
-	# Additional requested tokens
 	"USDE": {
 		"Ethereum": ("0x4c9edd5852cd905f086c759e8383e09bff1e68b3", 18),
 		"Arbitrum": ("0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34", 18),
