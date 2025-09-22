@@ -5,7 +5,8 @@ from typing import List, Optional
 
 class Settings(BaseSettings):
 	# Database
-	SUPABASE_DB_URL: str = Field(..., description="Postgres connection URL")
+	SUPABASE_DB_URL: Optional[str] = Field(default=None, description="Postgres connection URL (Supabase)")
+	DATABASE_URL: Optional[str] = Field(default=None, description="Generic Postgres connection URL")
 	SUPABASE_URL: Optional[str] = None
 	SUPABASE_ANON_KEY: Optional[str] = None
 	SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
