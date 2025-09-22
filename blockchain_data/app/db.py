@@ -8,11 +8,14 @@ _pool: Optional[asyncpg.Pool] = None
 async def init_db_pool() -> None:
 	global _pool
 	if _pool is None:
-		_pool = await asyncpg.create_pool(dsn=settings.SUPABASE_DB_URL, min_size=1, max_size=10)
+		dsn = settings.SUPABASE_DB_URL or settings.DATABASE_URL
+		if not dsn:
+			raise RuntimeError("No database URL configured. Set SUPABASE_DB_URL or DATABASE_URL.")
+		_pool = await asyncpg.create_pool(dsn=dsn, min_size=1, max_size=10)
 
 
 async def close_db_pool() -> None:
-	global _pool
+	global _poola
 	if _pool is not None:
 		await _pool.close()
 		_pool = None
