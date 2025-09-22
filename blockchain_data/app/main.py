@@ -3,9 +3,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.db import init_db_pool, close_db_pool
 from app.routers import router as api_router
 from app.etl import start_background_workers
+from app.supabase_client import init_supabase_client
 
 app = FastAPI(title="Stablecoin Analytics API", version="1.0.0")
 
@@ -20,19 +20,33 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def on_startup() -> None:
-	await init_db_pool()
-	# Start ETL workers in background
+	init_supabase_client()
 	asyncio.create_task(start_background_workers())
 
 
 @app.on_event("shutdown")
 async def on_shutdown() -> None:
-	await close_db_pool()
+	pass
 
 
 @app.get("/")
-async def health():
+async def root_health():
 	return {"status": "ok", "env": settings.ENV}
+
+
+@app.head("/")
+async def root_health_head():
+	return {}
+
+
+@app.get("/health")
+async def service_health():
+	return {"status": "ok"}
+
+
+@app.head("/health")
+async def service_health_head():
+	return {}
 
 
 app.include_router(api_router)

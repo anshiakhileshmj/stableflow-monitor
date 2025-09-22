@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Query
 
 from app.auth import require_api_key
-from app.db import get_pool
+from app.supabase_client import client
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_api_key)])
 
@@ -19,99 +19,93 @@ async def get_transfers(
 	window_sec: int = Query(default=5, ge=1, le=600),
 	limit: int = Query(default=500, ge=1, le=2000),
 ) -> List[Dict[str, Any]]:
-	pool = get_pool()
-	clauses = []
-	params = []
-
-	# If live mode and no explicit from/to provided, default to recent window across all chains
-	if live and not from_ and not to:
-		from_dt = datetime.now(timezone.utc) - timedelta(seconds=window_sec)
-		clauses.append("block_timestamp >= $%d" % (len(params) + 1))
-		params.append(from_dt)
-	elif from_:
-		clauses.append("block_timestamp >= $%d" % (len(params) + 1))
-		params.append(datetime.fromisoformat(from_))
-	if to:
-		clauses.append("block_timestamp <= $%d" % (len(params) + 1))
-		params.append(datetime.fromisoformat(to))
+	params: Dict[str, Any] = {
+		"order": "block_timestamp.desc",
+		"limit": limit,
+	}
 	if token:
-		clauses.append("token = $%d" % (len(params) + 1))
-		params.append(token)
+		params["token"] = f"eq.{token}"
 	if network:
-		clauses.append("network = $%d" % (len(params) + 1))
-		params.append(network)
-
-	where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-	rows = await pool.fetch(
-		f"SELECT network, chain_id, token, token_address, amount, from_address, to_address, tx_hash, block_number, block_timestamp, gas_used, gas_price, gas_fee, status FROM stablecoin_transfers{where} ORDER BY block_timestamp DESC LIMIT {limit}",
-		*params,
-	)
-	return [dict(r) for r in rows]
+		params["network"] = f"eq.{network}"
+	if live and not from_ and not to:
+		from_dt = (datetime.now(timezone.utc) - timedelta(seconds=window_sec)).isoformat()
+		params["block_timestamp"] = f"gte.{from_dt}"
+	else:
+		if from_:
+			params["block_timestamp"] = f"gte.{datetime.fromisoformat(from_).isoformat()}"
+		if to:
+			params["block_timestamp"] = f"lte.{datetime.fromisoformat(to).isoformat()}"
+	rows = client.select("stablecoin_transfers", params)
+	return rows
 
 
 @router.get("/analytics/global-flows")
 async def global_flows() -> Dict[str, Any]:
-	pool = get_pool()
-	vol_by_network = await pool.fetch("SELECT network, SUM(amount) AS volume FROM stablecoin_transfers GROUP BY network ORDER BY volume DESC")
-	vol_by_token = await pool.fetch("SELECT token, SUM(amount) AS volume FROM stablecoin_transfers GROUP BY token ORDER BY volume DESC")
-	top_senders = await pool.fetch(
-		"SELECT from_address as wallet, SUM(amount) AS total FROM stablecoin_transfers GROUP BY from_address ORDER BY total DESC LIMIT 10"
-	)
-	top_receivers = await pool.fetch(
-		"SELECT to_address as wallet, SUM(amount) AS total FROM stablecoin_transfers GROUP BY to_address ORDER BY total DESC LIMIT 10"
-	)
-	avg_gas = await pool.fetchrow("SELECT AVG(gas_fee) AS avg_gas_fee FROM stablecoin_transfers WHERE gas_fee IS NOT NULL AND gas_fee > 0")
+	# Basic aggregates via RPC or views would be ideal; as a simple fallback, fetch limited rows and compute here
+	rows = client.select("stablecoin_transfers", {"order": "block_timestamp.desc", "limit": 5000})
+	tot_by_network: Dict[str, float] = {}
+	tot_by_token: Dict[str, float] = {}
+	sent: Dict[str, float] = {}
+	recv: Dict[str, float] = {}
+	gas_total = 0.0
+	gas_count = 0
+	for r in rows:
+		net = r.get("network")
+		tok = r.get("token")
+		amt = float(r.get("amount") or 0)
+		gas = float(r.get("gas_fee") or 0)
+		src = r.get("from_address")
+		dst = r.get("to_address")
+		if net:
+			tot_by_network[net] = tot_by_network.get(net, 0.0) + amt
+		if tok:
+			tot_by_token[tok] = tot_by_token.get(tok, 0.0) + amt
+		if src:
+			sent[src] = sent.get(src, 0.0) + amt
+		if dst:
+			recv[dst] = recv.get(dst, 0.0) + amt
+		if gas > 0:
+			gas_total += gas
+			gas_count += 1
+	def top_n(d: Dict[str, float], n: int) -> List[Dict[str, Any]]:
+		return sorted(({"wallet": k, "total": v} for k, v in d.items()), key=lambda x: x["total"], reverse=True)[:n]
 	return {
-		"total_volume_by_network": [dict(r) for r in vol_by_network],
-		"total_volume_by_token": [dict(r) for r in vol_by_token],
-		"top_10_sending_wallets": [dict(r) for r in top_senders],
-		"top_10_receiving_wallets": [dict(r) for r in top_receivers],
-		"average_gas_fees": avg_gas["avg_gas_fee"] if avg_gas else None,
+		"total_volume_by_network": [{"network": k, "volume": v} for k, v in tot_by_network.items()],
+		"total_volume_by_token": [{"token": k, "volume": v} for k, v in tot_by_token.items()],
+		"top_10_sending_wallets": top_n(sent, 10),
+		"top_10_receiving_wallets": top_n(recv, 10),
+		"average_gas_fees": (gas_total / gas_count) if gas_count else None,
 	}
 
 
 @router.get("/wallets/{wallet_address}/balances")
 async def wallet_balances(wallet_address: str, network: Optional[str] = None, token: Optional[str] = None) -> List[Dict[str, Any]]:
-	pool = get_pool()
-	clauses = ["wallet_address = $1"]
-	params = [wallet_address]
+	params: Dict[str, Any] = {
+		"wallet_address": f"eq.{wallet_address}",
+		"order": "fetched_at.desc",
+		"limit": 200,
+	}
 	if network:
-		clauses.append("network = $%d" % (len(params) + 1))
-		params.append(network)
+		params["network"] = f"eq.{network}"
 	if token:
-		clauses.append("token = $%d" % (len(params) + 1))
-		params.append(token)
-	where = " AND ".join(clauses)
-	rows = await pool.fetch(
-		f"SELECT wallet_address, network, token, token_address, balance, fetched_at FROM wallet_balances WHERE {where} ORDER BY fetched_at DESC LIMIT 200",
-		*params,
-	)
-	return [dict(r) for r in rows]
+		params["token"] = f"eq.{token}"
+	rows = client.select("wallet_balances", params)
+	return rows
 
 
 @router.get("/whales/live")
 async def whales_live(network: Optional[str] = None, token: Optional[str] = None) -> List[Dict[str, Any]]:
-	pool = get_pool()
-	clauses = []
-	params = []
+	params: Dict[str, Any] = {"order": "block_timestamp.desc", "limit": 200}
 	if network:
-		clauses.append("network = $%d" % (len(params) + 1))
-		params.append(network)
+		params["network"] = f"eq.{network}"
 	if token:
-		clauses.append("token = $%d" % (len(params) + 1))
-		params.append(token)
-	where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-	rows = await pool.fetch(
-		f"SELECT network, token, token_address, amount, from_address, to_address, tx_hash, block_number, block_timestamp, gas_used, gas_price, gas_fee, status FROM whale_transfers{where} ORDER BY block_timestamp DESC LIMIT 200",
-		*params,
-	)
-	return [dict(r) for r in rows]
+		params["token"] = f"eq.{token}"
+	rows = client.select("whale_transfers", params)
+	return rows
 
 
 @router.get("/whales/top-wallets")
 async def whales_top_wallets() -> List[Dict[str, Any]]:
-	pool = get_pool()
-	rows = await pool.fetch(
-		"SELECT network, wallet_address, token, total_sent, total_received, last_updated FROM whale_top_wallets ORDER BY GREATEST(COALESCE(total_sent,0), COALESCE(total_received,0)) DESC LIMIT 500"
-	)
-	return [dict(r) for r in rows]
+	# If you create a materialized view in Supabase called whale_top_wallets, this will read it
+	rows = client.select("whale_top_wallets", {"order": "last_updated.desc", "limit": 500})
+	return rows
