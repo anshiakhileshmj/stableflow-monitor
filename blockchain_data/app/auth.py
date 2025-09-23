@@ -1,23 +1,22 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.db import get_pool
+from app.supabase_client import client
 
 security = HTTPBearer(auto_error=True)
 
 
-async def require_api_key(creds: HTTPAuthorizationCredentials = Depends(security)) -> str:
+def require_api_key(creds: HTTPAuthorizationCredentials = Depends(security)) -> str:
 	if creds is None or not creds.scheme.lower() == "bearer":
 		raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid auth header")
 	api_key = creds.credentials.strip()
-	pool = get_pool()
-	row = await pool.fetchrow(
-		"SELECT id, api_key FROM api_keys WHERE api_key=$1",
-		api_key,
-	)
-	if not row:
+	if not client:
+		raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Auth not initialized")
+	rows = client.select("api_keys", {"api_key": f"eq.{api_key}", "limit": 1})
+	if not rows:
 		raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
-	await pool.execute(
-		"UPDATE api_keys SET usage_count = COALESCE(usage_count,0)+1 WHERE id=$1",
-		row["id"],
-	)
+	# Best-effort usage_count increment (ignore errors)
+	try:
+		client.upsert("api_keys", [{"id": rows[0].get("id"), "usage_count": (rows[0].get("usage_count") or 0) + 1}], on_conflict="id")
+	except Exception:
+		pass
 	return api_key
