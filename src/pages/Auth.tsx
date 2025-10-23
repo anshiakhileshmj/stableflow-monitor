@@ -192,10 +192,7 @@ const Auth = () => {
         <CardHeader className="text-center space-y-2">
           <div className="flex items-center justify-center mb-4">
             <Shield className="w-8 h-8 text-primary mr-2" />
-            <div>
-              <CardTitle className="text-2xl">AML Tracker</CardTitle>
-              <CardDescription>Secure Access Portal</CardDescription>
-            </div>
+            <CardTitle className="text-2xl">Stablecoin Scanner</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
@@ -259,7 +256,7 @@ const Auth = () => {
               <Alert>
                 <Shield className="h-4 w-4" />
                 <AlertDescription>
-                  Create an account to access the AML tracking system. Your credentials are securely stored.
+                  Create an account to access the Stablecoin Scanner. Your credentials are securely stored.
                 </AlertDescription>
               </Alert>
               
